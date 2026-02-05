@@ -113,6 +113,7 @@ model Template {
 
   // Relations
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns         Campaign[]
   campaignMessages  CampaignMessage[]
   messages          Message[]
 
