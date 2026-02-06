@@ -23,9 +23,9 @@ Reachly is a production-grade SaaS application that enables businesses to:
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **Next.js 14** - React framework with App Router
+- **Next.js 16** - React framework with App Router
 - **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first CSS framework
+- **Tailwind CSS 4** - Utility-first CSS framework
 - **shadcn/ui** - Modern React component library
 - **Radix UI** - Accessible component primitives
 - **Framer Motion** - Animation library

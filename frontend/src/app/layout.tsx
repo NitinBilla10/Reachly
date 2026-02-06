@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { ThemeProvider } from 'next-themes'
-import { Toaster } from 'react-hot-toast'
+import Providers from './providers'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -49,37 +48,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: 'hsl(var(--card))',
-                color: 'hsl(var(--card-foreground))',
-                border: '1px solid hsl(var(--border))',
-              },
-              success: {
-                iconTheme: {
-                  primary: 'hsl(142, 76%, 36%)',
-                  secondary: 'white',
-                },
-              },
-              error: {
-                iconTheme: {
-                  primary: 'hsl(0, 84%, 60%)',
-                  secondary: 'white',
-                },
-              },
-            }}
-          />
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

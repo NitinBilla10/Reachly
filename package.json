@@ -8,10 +8,9 @@
     "dev:backend": "cd backend && npm run dev",
     "build": "cd frontend && npm run build && cd ../backend && npm run build",
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
-    "postinstall": "npm run prisma:generate",
-    "prisma:generate": "cd backend && npx prisma generate",
-    "prisma:migrate": "cd backend && npx prisma migrate dev",
-    "prisma:studio": "cd backend && npx prisma studio"
+    "prisma:generate": "npm --workspace backend run prisma:generate",
+    "prisma:migrate": "npm --workspace backend run prisma:migrate",
+    "prisma:studio": "npm --workspace backend run prisma:studio"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
