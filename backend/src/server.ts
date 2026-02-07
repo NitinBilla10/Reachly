@@ -11,10 +11,13 @@ import dotenv from 'dotenv';
 // Import routes
 import authRoutes from './routes/auth';
 import customerRoutes from './routes/customers';
+import contactTypeRoutes from './routes/contactTypes';
 import tagRoutes from './routes/tags';
 import templateRoutes from './routes/templates';
+import quickReplyRoutes from './routes/quickReplies';
 import campaignRoutes from './routes/campaigns';
 import messageRoutes from './routes/messages';
+import importRoutes from './routes/imports';
 import settingsRoutes from './routes/settings';
 import webhookRoutes from './routes/webhooks';
 import analyticsRoutes from './routes/analytics';
@@ -25,6 +28,7 @@ import { authenticateToken } from './middleware/auth';
 
 // Import services
 import { initializeSocket } from './services/socket';
+import { closeQueueConnections } from './services/queue';
 
 dotenv.config();
 
@@ -45,7 +49,17 @@ const limiter = rateLimit({
 });
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", process.env.FRONTEND_URL || "http://localhost:3000"],
+    },
+  },
+}));
 app.use(compression());
 app.use(morgan('combined'));
 app.use(limiter);
@@ -58,16 +72,23 @@ app.use(express.urlencoded({ extended: true }));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0'
+  });
 });
 
 // API Routes
 app.use('/auth', authRoutes);
 app.use('/customers', authenticateToken, customerRoutes);
+app.use('/contact-types', authenticateToken, contactTypeRoutes);
 app.use('/tags', authenticateToken, tagRoutes);
 app.use('/templates', authenticateToken, templateRoutes);
+app.use('/quick-replies', authenticateToken, quickReplyRoutes);
 app.use('/campaigns', authenticateToken, campaignRoutes);
 app.use('/messages', authenticateToken, messageRoutes);
+app.use('/imports', authenticateToken, importRoutes);
 app.use('/settings', authenticateToken, settingsRoutes);
 app.use('/webhooks', webhookRoutes); // No auth for webhooks
 app.use('/analytics', authenticateToken, analyticsRoutes);
@@ -83,6 +104,24 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Reachly Backend running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔌 WebSocket server initialized`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  await closeQueueConnections();
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully');
+  await closeQueueConnections();
+  server.close(() => {
+    console.log('Process terminated');
+  });
 });
 
 export { io };

@@ -1,134 +1,162 @@
 'use client'
 
-import { Send, Search } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { useState, useEffect } from 'react'
+import { Inbox, Loader2, Search, Send, Phone, MoreVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
+import { messagesAPI } from '@/lib/api'
+import toast from 'react-hot-toast'
+import { getInitials, formatRelativeTime } from '@/lib/utils'
 
-const conversations = [
-  {
-    name: 'Ava Thompson',
-    lastMessage: 'Sure, I would love the new catalog.',
-    time: '2m',
-    unread: 2,
-  },
-  {
-    name: 'Liam Patel',
-    lastMessage: 'Can you share delivery details?',
-    time: '45m',
-    unread: 0,
-  },
-  {
-    name: 'Sofia Gomez',
-    lastMessage: 'Thank you! The order arrived today.',
-    time: '1h',
-    unread: 0,
-  },
-  {
-    name: 'Noah Lee',
-    lastMessage: 'I am interested in the VIP program.',
-    time: '3h',
-    unread: 1,
-  },
-]
-
-const messages = [
-  {
-    id: 1,
-    sender: 'customer',
-    content: 'Hi! I saw your new launch on WhatsApp.',
-    time: '09:12 AM',
-  },
-  {
-    id: 2,
-    sender: 'agent',
-    content: 'Hi Ava! Thanks for reaching out. Would you like the catalog?',
-    time: '09:13 AM',
-  },
-  {
-    id: 3,
-    sender: 'customer',
-    content: 'Yes please, I am interested in wholesale pricing.',
-    time: '09:14 AM',
-  },
-]
+interface Conversation {
+  id: string
+  customer: {
+    id: string
+    name: string
+    phone: string
+    profileImage?: string
+  }
+  unreadCount: number
+  lastMessageAt: string
+  status: string
+  isPinned: boolean
+}
 
 export default function InboxPage() {
-  return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-      <Card className="flex h-[calc(100vh-160px)] flex-col">
-        <div className="border-b p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search conversations" />
-          </div>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="divide-y">
-            {conversations.map((chat) => (
-              <div key={chat.name} className="flex items-start gap-3 p-4 hover:bg-muted/50">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold">
-                  {chat.name
-                    .split(' ')
-                    .map((part) => part[0])
-                    .join('')}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">{chat.name}</p>
-                    <span className="text-xs text-muted-foreground">{chat.time}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{chat.lastMessage}</p>
-                </div>
-                {chat.unread > 0 && <Badge variant="success">{chat.unread}</Badge>}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </Card>
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
-      <Card className="flex h-[calc(100vh-160px)] flex-col">
-        <div className="border-b p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold">Ava Thompson</p>
-              <p className="text-xs text-muted-foreground">Last seen 5 minutes ago</p>
-            </div>
-            <Badge variant="secondary">VIP</Badge>
-          </div>
+  useEffect(() => {
+    loadConversations()
+  }, [])
+
+  const loadConversations = async () => {
+    try {
+      setIsLoading(true)
+      const response = await messagesAPI.getConversations()
+      setConversations(response.data.data.conversations)
+    } catch (error) {
+      toast.error('Failed to load conversations')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Shared Inbox</h1>
+          <p className="text-muted-foreground">
+            Manage conversations with your customers
+          </p>
         </div>
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.sender === 'agent' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[70%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                    message.sender === 'agent'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-foreground'
-                  }`}
-                >
-                  <p>{message.content}</p>
-                  <span className="mt-1 block text-[10px] opacity-70">{message.time}</span>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)]">
+        {/* Conversations List */}
+        <Card className="lg:col-span-1 overflow-hidden">
+          <CardHeader className="pb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search conversations..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 overflow-y-auto h-[calc(100%-5rem)]">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                <Inbox className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold">No conversations yet</h3>
+                <p className="text-muted-foreground text-sm">
+                  Conversations will appear here when customers message you.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {conversations.map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
+                      conversation.unreadCount > 0 ? 'bg-primary/5' : ''
+                    }`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={conversation.customer.profileImage} />
+                      <AvatarFallback>{getInitials(conversation.customer.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium truncate">{conversation.customer.name}</p>
+                        {conversation.unreadCount > 0 && (
+                          <Badge variant="default" className="ml-2">
+                            {conversation.unreadCount}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {conversation.customer.phone}
+                      </p>
+                    </div>
+                    {conversation.lastMessageAt && (
+                      <span className="text-xs text-muted-foreground">
+                        {formatRelativeTime(conversation.lastMessageAt)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Chat Area */}
+        <Card className="lg:col-span-2 flex flex-col">
+          <CardHeader className="border-b pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback>?</AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle className="text-base">Select a conversation</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Choose a customer from the list to start chatting
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
-        </ScrollArea>
-        <div className="border-t p-4">
-          <div className="flex items-center gap-2">
-            <Input placeholder="Type a message" />
-            <Button size="icon">
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </Card>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <Phone className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">WhatsApp Inbox</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto">
+                Your WhatsApp conversations will appear here. Connect your WhatsApp Business API to start receiving messages.
+              </p>
+              <Button className="mt-4" variant="outline">
+                <Send className="mr-2 h-4 w-4" />
+                Start New Chat
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

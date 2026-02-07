@@ -1,9 +1,9 @@
 import { Router, Response } from 'express';
 import { prisma } from '../services/database';
 import { createError } from '../middleware/errorHandler';
-import { createCampaignSchema } from '../validation/common';
+import { createCampaignSchema, updateCampaignSchema } from '../validation/common';
 import { AuthRequest } from '../middleware/auth';
-import { WhatsAppService } from '../services/whatsapp';
+import { campaignQueue } from '../services/queue';
 import { getSocketService } from '../services/socket';
 
 const router = Router();
@@ -11,26 +11,73 @@ const router = Router();
 // Get all campaigns
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const campaigns = await prisma.campaign.findMany({
-      where: {
-        userId: req.user!.id
-      },
-      include: {
-        template: true,
-        _count: {
-          select: {
-            campaignMessages: true
+    const { status, page = '1', limit = '10' } = req.query;
+    
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    const where: any = {
+      userId: req.user!.id
+    };
+
+    if (status) {
+      where.status = status;
+    }
+
+    const [campaigns, totalCount] = await Promise.all([
+      prisma.campaign.findMany({
+        where,
+        include: {
+          template: {
+            select: {
+              id: true,
+              name: true,
+              category: true
+            }
+          },
+          targetTags: {
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true
+                }
+              }
+            }
+          },
+          _count: {
+            select: {
+              campaignMessages: true
+            }
           }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip,
+        take: limitNum
+      }),
+      prisma.campaign.count({ where })
+    ]);
+
+    const formattedCampaigns = campaigns.map(campaign => ({
+      ...campaign,
+      targetTags: campaign.targetTags.map(tt => tt.tag)
+    }));
 
     res.json({
       success: true,
-      data: campaigns
+      data: {
+        campaigns: formattedCampaigns,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limitNum)
+        }
+      }
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -52,14 +99,25 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       },
       include: {
         template: true,
+        targetTags: {
+          include: {
+            tag: true
+          }
+        },
         campaignMessages: {
           include: {
-            customer: true,
-            tag: true
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                phone: true
+              }
+            }
           },
           orderBy: {
             createdAt: 'desc'
-          }
+          },
+          take: 100
         }
       }
     });
@@ -68,9 +126,14 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       throw createError('Campaign not found', 404);
     }
 
+    const formattedCampaign = {
+      ...campaign,
+      targetTags: campaign.targetTags.map(tt => tt.tag)
+    };
+
     res.json({
       success: true,
-      data: campaign
+      data: formattedCampaign
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -80,12 +143,12 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Create new campaign (without sending)
+// Create new campaign
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const validatedData = createCampaignSchema.parse(req.body);
 
-    // Verify template belongs to user
+    // Validate template exists and belongs to user
     const template = await prisma.template.findFirst({
       where: {
         id: validatedData.templateId,
@@ -97,49 +160,119 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       throw createError('Template not found', 404);
     }
 
-    // Verify tags belong to user
-    const tags = await prisma.tag.findMany({
-      where: {
-        id: { in: validatedData.tagIds },
-        userId: req.user!.id
-      }
-    });
+    // Validate tags if provided
+    if (validatedData.tagIds && validatedData.tagIds.length > 0) {
+      const tags = await prisma.tag.findMany({
+        where: {
+          id: { in: validatedData.tagIds },
+          userId: req.user!.id
+        }
+      });
 
-    if (tags.length !== validatedData.tagIds.length) {
-      throw createError('One or more tags not found', 400);
+      if (tags.length !== validatedData.tagIds.length) {
+        throw createError('One or more tags not found', 400);
+      }
     }
 
-    // Count customers that will receive the campaign
-    const customerCount = await prisma.customer.count({
-      where: {
+    // Create campaign
+    const campaign = await prisma.campaign.create({
+      data: {
+        name: validatedData.name,
+        description: validatedData.description,
+        templateId: validatedData.templateId,
         userId: req.user!.id,
-        tags: {
-          some: {
-            tagId: { in: validatedData.tagIds }
+        status: validatedData.scheduledAt ? 'scheduled' : 'draft',
+        scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : null,
+        ...(validatedData.tagIds && validatedData.tagIds.length > 0 && {
+          targetTags: {
+            create: validatedData.tagIds.map(tagId => ({ tagId }))
+          }
+        })
+      },
+      include: {
+        template: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
+        },
+        targetTags: {
+          include: {
+            tag: true
           }
         }
       }
     });
 
-    if (customerCount === 0) {
-      throw createError('No customers found with the selected tags', 400);
+    // If scheduled, add to queue
+    if (validatedData.scheduledAt) {
+      const delay = new Date(validatedData.scheduledAt).getTime() - Date.now();
+      if (delay > 0) {
+        await campaignQueue.add(
+          'send-campaign',
+          { campaignId: campaign.id, userId: req.user!.id },
+          { delay }
+        );
+      }
     }
 
-    const campaign = await prisma.campaign.create({
-      data: {
-        ...validatedData,
-        userId: req.user!.id,
-        totalMessages: customerCount,
-        scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : null
-      },
-      include: {
-        template: true
-      }
-    });
+    const formattedCampaign = {
+      ...campaign,
+      targetTags: campaign.targetTags.map(tt => tt.tag)
+    };
 
     res.status(201).json({
       success: true,
       message: 'Campaign created successfully',
+      data: formattedCampaign
+    });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors
+      });
+    }
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Update campaign
+router.put('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validatedData = updateCampaignSchema.parse(req.body);
+
+    // Check if campaign exists and belongs to user
+    const existingCampaign = await prisma.campaign.findFirst({
+      where: {
+        id,
+        userId: req.user!.id
+      }
+    });
+
+    if (!existingCampaign) {
+      throw createError('Campaign not found', 404);
+    }
+
+    // Cannot update campaign that's already sending or completed
+    if (['sending', 'completed'].includes(existingCampaign.status)) {
+      throw createError('Cannot update campaign that is already sending or completed', 400);
+    }
+
+    const campaign = await prisma.campaign.update({
+      where: { id },
+      data: validatedData
+    });
+
+    res.json({
+      success: true,
+      message: 'Campaign updated successfully',
       data: campaign
     });
   } catch (error: any) {
@@ -161,6 +294,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.post('/:id/send', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const { tagIds } = req.body;
 
     const campaign = await prisma.campaign.findFirst({
       where: {
@@ -180,30 +314,20 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
       throw createError('Only draft campaigns can be sent', 400);
     }
 
-    // Get customers with selected tags
-    const customers = await prisma.customer.findMany({
-      where: {
-        userId: req.user!.id,
-        tags: {
-          some: {
-            tagId: { in: req.body.tagIds || [] }
-          }
-        }
-      },
-      include: {
-        tags: {
-          where: {
-            tagId: { in: req.body.tagIds || [] }
-          },
-          include: {
-            tag: true
-          }
-        }
-      }
-    });
+    // Update tag targets if provided
+    if (tagIds && tagIds.length > 0) {
+      // Delete existing targets
+      await prisma.campaignTargetTag.deleteMany({
+        where: { campaignId: id }
+      });
 
-    if (customers.length === 0) {
-      throw createError('No customers found with the selected tags', 400);
+      // Create new targets
+      await prisma.campaignTargetTag.createMany({
+        data: tagIds.map((tagId: string) => ({
+          campaignId: id,
+          tagId
+        }))
+      });
     }
 
     // Update campaign status
@@ -215,46 +339,16 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
       }
     });
 
-    // Create campaign messages
-    const campaignMessages = await Promise.all(
-      customers.map(customer => {
-        // Replace template variables with customer data
-        let messageContent = campaign.template.content;
-        
-        // Basic variable replacement
-        if (campaign.template.variables) {
-          const variables = campaign.template.variables as string[];
-          variables.forEach(variable => {
-            const value = (customer as any)[variable] || '';
-            messageContent = messageContent.replace(
-              new RegExp(`{{${variable}}}`, 'g'),
-              String(value)
-            );
-          });
-        }
-
-        return prisma.campaignMessage.create({
-          data: {
-            campaignId: id,
-            customerId: customer.id,
-            templateId: campaign.templateId,
-            content: messageContent,
-            tagId: customer.tags[0]?.tagId // Use first tag
-          }
-        });
-      })
-    );
-
-    // Start sending messages asynchronously
-    processCampaignMessages(campaign.id, req.user!.id);
+    // Add to queue
+    await campaignQueue.add('send-campaign', {
+      campaignId: id,
+      userId: req.user!.id
+    });
 
     res.json({
       success: true,
-      message: 'Campaign sending started',
-      data: {
-        campaignId: id,
-        totalMessages: campaignMessages.length
-      }
+      message: 'Campaign is being sent',
+      data: { campaignId: id, status: 'sending' }
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -265,7 +359,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
 });
 
 // Cancel campaign
-router.put('/:id/cancel', async (req: AuthRequest, res: Response) => {
+router.post('/:id/cancel', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -280,42 +374,58 @@ router.put('/:id/cancel', async (req: AuthRequest, res: Response) => {
       throw createError('Campaign not found', 404);
     }
 
-    if (campaign.status !== 'sending') {
-      throw createError('Only sending campaigns can be cancelled', 400);
+    if (!['scheduled', 'sending'].includes(campaign.status)) {
+      throw createError('Only scheduled or sending campaigns can be cancelled', 400);
     }
 
-    // Mark pending messages as cancelled
-    await prisma.campaignMessage.updateMany({
-      where: {
-        campaignId: id,
-        status: 'pending'
-      },
-      data: {
-        status: 'failed',
-        failedAt: new Date(),
-        error: 'Campaign cancelled by user'
-      }
-    });
-
-    // Update campaign status
     await prisma.campaign.update({
       where: { id },
       data: {
-        status: 'failed'
+        status: 'cancelled',
+        completedAt: new Date()
       }
     });
-
-    // Emit real-time update
-    const socketService = getSocketService();
-    if (socketService) {
-      socketService.emitCampaignUpdate(req.user!.id, id, {
-        type: 'cancelled'
-      });
-    }
 
     res.json({
       success: true,
       message: 'Campaign cancelled successfully'
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Delete campaign
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const campaign = await prisma.campaign.findFirst({
+      where: {
+        id,
+        userId: req.user!.id
+      }
+    });
+
+    if (!campaign) {
+      throw createError('Campaign not found', 404);
+    }
+
+    // Cannot delete sending campaign
+    if (campaign.status === 'sending') {
+      throw createError('Cannot delete campaign that is currently sending', 400);
+    }
+
+    await prisma.campaign.delete({
+      where: { id }
+    });
+
+    res.json({
+      success: true,
+      message: 'Campaign deleted successfully'
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -341,36 +451,59 @@ router.get('/:id/analytics', async (req: AuthRequest, res: Response) => {
       throw createError('Campaign not found', 404);
     }
 
-    const messageStats = await prisma.campaignMessage.groupBy({
+    // Get message status breakdown
+    const statusCounts = await prisma.campaignMessage.groupBy({
       by: ['status'],
-      where: {
-        campaignId: id
-      },
+      where: { campaignId: id },
       _count: {
         status: true
       }
     });
 
-    const recentMessages = await prisma.campaignMessage.findMany({
+    // Get hourly delivery stats
+    const hourlyStats = await prisma.campaignMessage.groupBy({
+      by: ['sentAt'],
       where: {
-        campaignId: id
+        campaignId: id,
+        sentAt: { not: null }
       },
-      include: {
-        customer: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 10
+      _count: {
+        id: true
+      }
     });
+
+    const statusBreakdown = statusCounts.reduce((acc, item) => {
+      acc[item.status] = item._count.status;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const analytics = {
+      overview: {
+        total: campaign.totalMessages,
+        sent: campaign.sentMessages,
+        delivered: campaign.deliveredMessages,
+        read: campaign.readMessages,
+        failed: campaign.failedMessages,
+        pending: campaign.totalMessages - campaign.sentMessages - campaign.failedMessages
+      },
+      rates: {
+        deliveryRate: campaign.sentMessages > 0 
+          ? ((campaign.deliveredMessages / campaign.sentMessages) * 100).toFixed(2)
+          : '0',
+        readRate: campaign.deliveredMessages > 0
+          ? ((campaign.readMessages / campaign.deliveredMessages) * 100).toFixed(2)
+          : '0',
+        failureRate: campaign.totalMessages > 0
+          ? ((campaign.failedMessages / campaign.totalMessages) * 100).toFixed(2)
+          : '0'
+      },
+      statusBreakdown,
+      hourlyStats
+    };
 
     res.json({
       success: true,
-      data: {
-        campaign,
-        messageStats,
-        recentMessages
-      }
+      data: analytics
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -379,114 +512,5 @@ router.get('/:id/analytics', async (req: AuthRequest, res: Response) => {
     });
   }
 });
-
-// Helper function to process campaign messages
-async function processCampaignMessages(campaignId: string, userId: string) {
-  try {
-    const whatsappService = new WhatsAppService();
-    const socketService = getSocketService();
-
-    const campaignMessages = await prisma.campaignMessage.findMany({
-      where: {
-        campaignId,
-        status: 'pending'
-      },
-      include: {
-        customer: true
-      }
-    });
-
-    let sentCount = 0;
-    let deliveredCount = 0;
-    let failedCount = 0;
-
-    for (const message of campaignMessages) {
-      try {
-        // Send message via WhatsApp API
-        const result = await whatsappService.sendTemplateMessage(
-          userId,
-          message.customer.phone,
-          '', // Template name would come from template
-          'en_US'
-        );
-
-        if (result.success) {
-          await prisma.campaignMessage.update({
-            where: { id: message.id },
-            data: {
-              status: 'sent',
-              sentAt: new Date(),
-              whatsappMessageId: result.messageId
-            }
-          });
-          sentCount++;
-        } else {
-          await prisma.campaignMessage.update({
-            where: { id: message.id },
-            data: {
-              status: 'failed',
-              failedAt: new Date(),
-              error: result.error
-            }
-          });
-          failedCount++;
-        }
-
-        // Emit real-time update
-        if (socketService) {
-          socketService.emitCampaignUpdate(userId, campaignId, {
-            type: 'message_sent',
-            messageId: message.id,
-            status: result.success ? 'sent' : 'failed'
-          });
-        }
-
-        // Rate limiting - wait 1 second between messages
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        await prisma.campaignMessage.update({
-          where: { id: message.id },
-          data: {
-            status: 'failed',
-            failedAt: new Date(),
-            error: 'Failed to send message'
-          }
-        });
-        failedCount++;
-      }
-    }
-
-    // Update campaign with final counts
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: {
-        status: 'completed',
-        completedAt: new Date(),
-        sentMessages: sentCount,
-        failedMessages: failedCount
-      }
-    });
-
-    // Emit final campaign update
-    if (socketService) {
-      socketService.emitCampaignUpdate(userId, campaignId, {
-        type: 'completed',
-        sentCount,
-        failedCount,
-        deliveredCount
-      });
-    }
-  } catch (error) {
-    console.error('Campaign processing error:', error);
-    
-    // Mark campaign as failed
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: {
-        status: 'failed'
-      }
-    });
-  }
-}
 
 export default router;

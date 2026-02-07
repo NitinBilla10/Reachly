@@ -16,60 +16,148 @@ model User {
   password  String
   firstName String
   lastName  String
+  role      String   @default("user") // admin, user
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
+  workspaces          WorkspaceMember[]
+  ownedWorkspaces     Workspace[]
   whatsappCredentials WhatsAppCredentials?
   customers           Customer[]
+  contactTypes        ContactType[]
   tags                Tag[]
   templates           Template[]
+  quickReplies        QuickReply[]
   campaigns           Campaign[]
   conversations       Conversation[]
+  messages            Message[]
+  auditLogs           AuditLog[]
+  imports             ImportJob[]
 
   @@map("users")
 }
 
-model WhatsAppCredentials {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  accessToken   String   // Encrypted
-  phoneNumberId String
-  businessId    String
-  webhookVerifyToken String?
-  isActive      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  logo        String?
+  plan        String   @default("free") // free, starter, professional, enterprise
+  status      String   @default("active") // active, suspended, cancelled
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String
+  members     WorkspaceMember[]
+  whatsappCredentials WhatsAppCredentials?
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id        String   @id @default(cuid())
+  role      String   @default("member") // owner, admin, member
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+
+  @@unique([userId, workspaceId])
+  @@map("workspace_members")
+}
+
+model WhatsAppCredentials {
+  id                  String   @id @default(cuid())
+  accessToken         String   // Encrypted
+  phoneNumberId       String
+  businessId          String
+  webhookVerifyToken  String?
+  phoneNumber         String?
+  displayName         String?
+  qualityRating       String?
+  messagingLimit      String?
+  isActive            Boolean  @default(false)
+  lastVerifiedAt      DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String?    @unique
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String?    @unique
 
   @@map("whatsapp_credentials")
 }
 
-model Customer {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String
-  phone     String   @unique
-  email     String?
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model ContactType {
+  id          String   @id @default(cuid())
+  name        String
+  color       String   @default("#3B82F6")
+  description String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tags            CustomerTag[]
-  campaignMessages CampaignMessage[]
-  messages        Message[]
-  conversations   Conversation[]
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  customers Customer[]
 
+  @@unique([userId, name])
+  @@map("contact_types")
+}
+
+model Customer {
+  id                   String    @id @default(cuid())
+  phone                String
+  name                 String
+  email                String?
+  profileImage         String?
+  gender               String?   // male, female, other
+  companyName          String?
+  source               String?   // manual, import, api, campaign
+  address              String?
+  city                 String?
+  country              String?
+  socialLinks          Json?     // { facebook, twitter, linkedin, instagram }
+  optIn                Boolean   @default(true)
+  optInAt              DateTime?
+  isBlocked            Boolean   @default(false)
+  isPinned             Boolean   @default(false)
+  followUpStatus       String?   // follow-up, spam, unread, none
+  lastInboundMessageAt DateTime?
+  windowExpiresAt      DateTime? // WhatsApp 24-hour window
+  notes                String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Relations
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  contactType   ContactType?      @relation(fields: [contactTypeId], references: [id], onDelete: SetNull)
+  contactTypeId String?
+  tags          CustomerTag[]
+  groups        CustomerGroup[]
+  campaignMessages CampaignMessage[]
+  messages      Message[]
+  conversations Conversation[]
+
+  @@unique([userId, phone])
   @@map("customers")
 }
 
 model Tag {
   id          String   @id @default(cuid())
-  userId      String
   name        String
   color       String   @default("#3B82F6")
   description String?
@@ -77,8 +165,9 @@ model Tag {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  customers    CustomerTag[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  customers        CustomerTag[]
   campaignMessages CampaignMessage[]
 
   @@unique([userId, name])
@@ -98,122 +187,245 @@ model CustomerTag {
   @@map("customer_tags")
 }
 
-model Template {
+model Group {
   id          String   @id @default(cuid())
-  userId      String
   name        String
-  category    String   // marketing, utility, authentication
-  language    String   @default("en_US")
-  content     String
-  variables   Json?    // Array of variable names
-  whatsappTemplateId String? // ID from WhatsApp API
-  status      String   @default("pending") // pending, approved, rejected
+  description String?
+  color       String   @default("#3B82F6")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  campaigns         Campaign[]
-  campaignMessages  CampaignMessage[]
-  messages          Message[]
+  customers CustomerGroup[]
+
+  @@map("groups")
+}
+
+model CustomerGroup {
+  customerId String
+  groupId    String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, groupId])
+  @@map("customer_groups")
+}
+
+model Template {
+  id                 String   @id @default(cuid())
+  name               String
+  category           String   // marketing, utility, authentication
+  language           String   @default("en_US")
+  content            String
+  header             String?  // Header text or media
+  headerType         String?  // text, image, video, document
+  footer             String?
+  variables          Json?    // Array of variable names
+  buttons            Json?    // Array of button objects
+  whatsappTemplateId String?  // ID from WhatsApp API
+  status             String   @default("draft") // draft, pending, approved, rejected
+  rejectionReason    String?
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  campaigns        Campaign[]
+  campaignMessages CampaignMessage[]
+  messages         Message[]
 
   @@unique([userId, name])
   @@map("templates")
 }
 
-model Campaign {
+model QuickReply {
   id          String   @id @default(cuid())
-  userId      String
-  name        String
-  description String?
-  templateId  String
-  status      String   @default("draft") // draft, sending, completed, failed
-  totalMessages Int     @default(0)
-  sentMessages  Int     @default(0)
-  deliveredMessages Int @default(0)
-  failedMessages  Int   @default(0)
-  scheduledAt  DateTime?
-  startedAt    DateTime?
-  completedAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  keyword     String   // Trigger keyword
+  response    String   // Response text
+  mediaUrl    String?  // Optional media attachment
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0) // Higher number = higher priority
+  matchType   String   @default("contains") // exact, contains, starts_with
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  template           Template            @relation(fields: [templateId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@map("quick_replies")
+}
+
+model Campaign {
+  id               String    @id @default(cuid())
+  name             String
+  description      String?
+  status           String    @default("draft") // draft, scheduled, sending, paused, completed, failed
+  totalMessages    Int       @default(0)
+  sentMessages     Int       @default(0)
+  deliveredMessages Int      @default(0)
+  readMessages     Int       @default(0)
+  failedMessages   Int       @default(0)
+  scheduledAt      DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  errorMessage     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String
+  template           Template          @relation(fields: [templateId], references: [id])
+  templateId         String
   campaignMessages   CampaignMessage[]
+  targetTags         CampaignTargetTag[]
 
   @@map("campaigns")
 }
 
-model CampaignMessage {
-  id         String   @id @default(cuid())
+model CampaignTargetTag {
   campaignId String
-  customerId String
-  tagId      String?
-  templateId String
-  content    String
-  status     String   @default("pending") // pending, sent, delivered, read, failed
-  whatsappMessageId String?
-  sentAt     DateTime?
-  deliveredAt DateTime?
-  readAt     DateTime?
-  failedAt   DateTime?
-  error      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  tagId      String
 
   // Relations
-  campaign  Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  customer  Customer  @relation(fields: [customerId], references: [id])
-  tag       Tag?      @relation(fields: [tagId], references: [id])
-  template  Template  @relation(fields: [templateId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, tagId])
+  @@map("campaign_target_tags")
+}
+
+model CampaignMessage {
+  id                String    @id @default(cuid())
+  content           String
+  status            String    @default("pending") // pending, sent, delivered, read, failed
+  whatsappMessageId String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  failedAt          DateTime?
+  error             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+  tag        Tag?     @relation(fields: [tagId], references: [id])
+  tagId      String?
+  template   Template @relation(fields: [templateId], references: [id])
+  templateId String
 
   @@unique([campaignId, customerId])
   @@map("campaign_messages")
 }
 
 model Conversation {
-  id         String   @id @default(cuid())
-  userId     String
-  customerId String
-  status     String   @default("active") // active, archived
+  id            String    @id @default(cuid())
+  status        String    @default("active") // active, archived, blocked
   lastMessageAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  unreadCount   Int       @default(0)
+  isPinned      Boolean   @default(false)
+  notes         String?
+  labels        Json?     // Array of label strings
+  assignedTo    String?   // User ID if assigned
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Relations
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
   customer Customer  @relation(fields: [customerId], references: [id])
-  messages Message[]
+  customerId String
+  messages  Message[]
 
   @@unique([userId, customerId])
   @@map("conversations")
 }
 
 model Message {
-  id               String   @id @default(cuid())
-  conversationId   String
-  customerId       String
-  templateId       String?
-  content          String
-  messageType      String   @default("text") // text, template, image, document
-  direction        String   // inbound, outbound
-  whatsappMessageId String?
-  status           String   @default("sent") // sent, delivered, read, failed
-  sentAt           DateTime @default(now())
-  deliveredAt      DateTime?
-  readAt           DateTime?
-  failedAt         DateTime?
-  error            String?
-  metadata         Json?    // Additional message data
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  content             String
+  messageType         String   @default("text") // text, template, image, video, audio, document, location
+  direction           String   // inbound, outbound
+  whatsappMessageId   String?
+  status              String   @default("sent") // sent, delivered, read, failed
+  mediaUrl            String?
+  mediaMimeType       String?
+  mediaCaption        String?
+  mediaSize           Int?
+  latitude            Float?
+  longitude           Float?
+  locationName        String?
+  locationAddress     String?
+  sentAt              DateTime @default(now())
+  deliveredAt         DateTime?
+  readAt              DateTime?
+  failedAt            DateTime?
+  error               String?
+  metadata            Json?    // Additional message data
+  isFromQuickReply    Boolean  @default(false)
+  quickReplyId        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   // Relations
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  customer     Customer     @relation(fields: [customerId], references: [id])
-  template     Template?    @relation(fields: [templateId], references: [id])
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  customerId     String
+  template       Template?    @relation(fields: [templateId], references: [id])
+  templateId     String?
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
 
   @@map("messages")
+}
+
+model ImportJob {
+  id              String   @id @default(cuid())
+  fileName        String
+  fileType        String   // csv, xlsx
+  status          String   @default("pending") // pending, processing, completed, failed
+  totalRows       Int      @default(0)
+  processedRows   Int      @default(0)
+  successRows     Int      @default(0)
+  failedRows      Int      @default(0)
+  errorLog        Json?    // Array of error messages
+  columnMapping   Json?    // { name: 'Column A', phone: 'Column B' }
+  duplicateStrategy String @default("skip") // skip, update, error
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@map("imports")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // create, update, delete, login, logout, etc.
+  entityType  String   // customer, tag, template, campaign, etc.
+  entityId    String?
+  oldValue    Json?
+  newValue    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@map("audit_logs")
 }

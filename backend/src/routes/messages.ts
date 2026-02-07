@@ -1,9 +1,9 @@
 import { Router, Response } from 'express';
 import { prisma } from '../services/database';
 import { createError } from '../middleware/errorHandler';
-import { sendMessageSchema } from '../validation/common';
+import { sendMessageSchema, sendBulkMessageSchema } from '../validation/common';
 import { AuthRequest } from '../middleware/auth';
-import { WhatsAppService } from '../services/whatsapp';
+import { messageQueue } from '../services/queue';
 import { getSocketService } from '../services/socket';
 
 const router = Router();
@@ -11,30 +11,110 @@ const router = Router();
 // Get all conversations
 router.get('/conversations', async (req: AuthRequest, res: Response) => {
   try {
-    const conversations = await prisma.conversation.findMany({
-      where: {
-        userId: req.user!.id
-      },
-      include: {
-        customer: true,
-        _count: {
-          select: {
-            messages: {
-              where: {
-                direction: 'inbound'
-              }
+    const { status, search, page = '1', limit = '20' } = req.query;
+    
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    const where: any = {
+      userId: req.user!.id
+    };
+
+    if (status) {
+      where.status = status;
+    }
+
+    if (search) {
+      where.customer = {
+        OR: [
+          { name: { contains: search as string, mode: 'insensitive' } },
+          { phone: { contains: search as string, mode: 'insensitive' } }
+        ]
+      };
+    }
+
+    const [conversations, totalCount] = await Promise.all([
+      prisma.conversation.findMany({
+        where,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              profileImage: true,
+              isBlocked: true
             }
+          },
+          messages: {
+            orderBy: {
+              createdAt: 'desc'
+            },
+            take: 1
           }
-        }
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      }
-    });
+        },
+        orderBy: [
+          { isPinned: 'desc' },
+          { lastMessageAt: 'desc' }
+        ],
+        skip,
+        take: limitNum
+      }),
+      prisma.conversation.count({ where })
+    ]);
 
     res.json({
       success: true,
-      data: conversations
+      data: {
+        conversations,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limitNum)
+        }
+      }
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get single conversation
+router.get('/conversations/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id,
+        userId: req.user!.id
+      },
+      include: {
+        customer: {
+          include: {
+            tags: {
+              include: {
+                tag: true
+              }
+            },
+            contactType: true
+          }
+        }
+      }
+    });
+
+    if (!conversation) {
+      throw createError('Conversation not found', 404);
+    }
+
+    res.json({
+      success: true,
+      data: conversation
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -48,11 +128,13 @@ router.get('/conversations', async (req: AuthRequest, res: Response) => {
 router.get('/conversations/:id/messages', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 50;
-    const skip = (page - 1) * limit;
+    const { page = '1', limit = '50' } = req.query;
+    
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
 
-    // Check if conversation belongs to user
+    // Check if conversation exists and belongs to user
     const conversation = await prisma.conversation.findFirst({
       where: {
         id,
@@ -64,26 +146,59 @@ router.get('/conversations/:id/messages', async (req: AuthRequest, res: Response
       throw createError('Conversation not found', 404);
     }
 
-    const messages = await prisma.message.findMany({
+    const [messages, totalCount] = await Promise.all([
+      prisma.message.findMany({
+        where: {
+          conversationId: id
+        },
+        include: {
+          template: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip,
+        take: limitNum
+      }),
+      prisma.message.count({
+        where: { conversationId: id }
+      })
+    ]);
+
+    // Mark messages as read
+    await prisma.message.updateMany({
       where: {
-        conversationId: id
+        conversationId: id,
+        direction: 'inbound',
+        status: { not: 'read' }
       },
-      include: {
-        template: true,
-        customer: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      skip,
-      take: limit
+      data: {
+        status: 'read',
+        readAt: new Date()
+      }
+    });
+
+    // Reset unread count
+    await prisma.conversation.update({
+      where: { id },
+      data: { unreadCount: 0 }
     });
 
     res.json({
       success: true,
       data: {
-        messages: messages.reverse(), // Reverse to show oldest first
-        conversation
+        messages: messages.reverse(), // Return in chronological order
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limitNum)
+        }
       }
     });
   } catch (error: any) {
@@ -99,7 +214,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
   try {
     const validatedData = sendMessageSchema.parse(req.body);
 
-    // Verify conversation belongs to user
+    // Get conversation
     const conversation = await prisma.conversation.findFirst({
       where: {
         id: validatedData.conversationId,
@@ -114,82 +229,60 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
       throw createError('Conversation not found', 404);
     }
 
-    let messageContent = validatedData.content;
-    let templateId = null;
-
-    // If using a template, process it
-    if (validatedData.messageType === 'template' && validatedData.templateId) {
-      const template = await prisma.template.findFirst({
-        where: {
-          id: validatedData.templateId,
-          userId: req.user!.id
-        }
-      });
-
-      if (!template) {
-        throw createError('Template not found', 404);
-      }
-
-      templateId = template.id;
-
-      // Replace template variables
-      if (validatedData.templateVariables) {
-        messageContent = template.content;
-        Object.entries(validatedData.templateVariables).forEach(([key, value]) => {
-          const regex = new RegExp(`{{${key}}}`, 'g');
-          messageContent = messageContent.replace(regex, String(value));
-        });
-      }
+    if (conversation.customer.isBlocked) {
+      throw createError('Cannot send messages to blocked customers', 400);
     }
 
-    // Send message via WhatsApp API
-    const whatsappService = new WhatsAppService();
-    const result = await whatsappService.sendTextMessage(
-      req.user!.id,
-      conversation.customer.phone,
-      messageContent
-    );
-
-    if (!result.success) {
-      throw createError(`Failed to send message: ${result.error}`, 400);
+    // Check 24-hour window
+    const canSendFree = conversation.customer.windowExpiresAt && conversation.customer.windowExpiresAt > new Date();
+    
+    if (!canSendFree && validatedData.messageType !== 'template') {
+      throw createError('Cannot send free-form messages outside 24-hour window. Use templates instead.', 400);
     }
 
     // Create message record
     const message = await prisma.message.create({
       data: {
-        conversationId: validatedData.conversationId,
-        customerId: conversation.customerId,
-        templateId,
-        content: messageContent,
+        conversationId: conversation.id,
+        customerId: conversation.customer.id,
+        userId: req.user!.id,
+        content: validatedData.content,
         messageType: validatedData.messageType,
         direction: 'outbound',
-        whatsappMessageId: result.messageId,
-        status: 'sent'
-      },
-      include: {
-        template: true,
-        customer: true
+        status: 'pending',
+        templateId: validatedData.templateId,
+        mediaUrl: validatedData.mediaUrl,
+        mediaCaption: validatedData.mediaCaption
       }
     });
 
-    // Update conversation
+    // Add to queue for sending
+    await messageQueue.add('send-message', {
+      userId: req.user!.id,
+      customerId: conversation.customer.id,
+      conversationId: conversation.id,
+      messageId: message.id,
+      content: validatedData.content,
+      messageType: validatedData.messageType,
+      templateId: validatedData.templateId,
+      templateVariables: validatedData.templateVariables
+    });
+
+    // Update conversation last message time
     await prisma.conversation.update({
-      where: { id: validatedData.conversationId },
-      data: {
-        lastMessageAt: new Date(),
-        updatedAt: new Date()
-      }
+      where: { id: conversation.id },
+      data: { lastMessageAt: new Date() }
     });
 
-    // Emit real-time update
+    // Emit to socket
     const socketService = getSocketService();
     if (socketService) {
-      socketService.emitNewMessage(validatedData.conversationId, message);
+      socketService.emitNewMessage(conversation.id, message);
     }
 
-    res.status(201).json({
+    res.json({
       success: true,
-      message: 'Message sent successfully',
+      message: 'Message queued for sending',
       data: message
     });
   } catch (error: any) {
@@ -207,48 +300,84 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Mark message as read
-router.put('/messages/:id/read', async (req: AuthRequest, res: Response) => {
+// Send bulk messages
+router.post('/send-bulk', async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const validatedData = sendBulkMessageSchema.parse(req.body);
 
-    const message = await prisma.message.findFirst({
-      where: {
-        id,
-        conversation: {
-          userId: req.user!.id
+    const results = {
+      queued: 0,
+      failed: 0,
+      errors: [] as string[]
+    };
+
+    for (const customerId of validatedData.customerIds) {
+      try {
+        // Find or create conversation
+        let conversation = await prisma.conversation.findFirst({
+          where: {
+            customerId,
+            userId: req.user!.id
+          }
+        });
+
+        if (!conversation) {
+          conversation = await prisma.conversation.create({
+            data: {
+              userId: req.user!.id,
+              customerId
+            }
+          });
         }
+
+        // Create message
+        const message = await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            customerId,
+            userId: req.user!.id,
+            content: validatedData.content,
+            messageType: validatedData.messageType,
+            direction: 'outbound',
+            status: 'pending',
+            templateId: validatedData.templateId
+          }
+        });
+
+        // Add to queue
+        await messageQueue.add('send-message', {
+          userId: req.user!.id,
+          customerId,
+          conversationId: conversation.id,
+          messageId: message.id,
+          content: validatedData.content,
+          messageType: validatedData.messageType,
+          templateId: validatedData.templateId,
+          templateVariables: validatedData.templateVariables
+        }, {
+          delay: results.queued * 100 // 100ms delay between each message
+        });
+
+        results.queued++;
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push(`Customer ${customerId}: ${error.message}`);
       }
-    });
-
-    if (!message) {
-      throw createError('Message not found', 404);
-    }
-
-    if (message.direction !== 'inbound') {
-      throw createError('Can only mark inbound messages as read', 400);
-    }
-
-    const updatedMessage = await prisma.message.update({
-      where: { id },
-      data: {
-        status: 'read',
-        readAt: new Date()
-      }
-    });
-
-    // Emit real-time update
-    const socketService = getSocketService();
-    if (socketService) {
-      socketService.emitMessageStatusUpdate(message.conversationId, id, 'read');
     }
 
     res.json({
       success: true,
-      message: 'Message marked as read',
-      data: updatedMessage
+      message: `Bulk send initiated. ${results.queued} messages queued, ${results.failed} failed.`,
+      data: results
     });
   } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors
+      });
+    }
     res.status(error.statusCode || 500).json({
       success: false,
       error: error.message
@@ -257,7 +386,7 @@ router.put('/messages/:id/read', async (req: AuthRequest, res: Response) => {
 });
 
 // Archive conversation
-router.put('/conversations/:id/archive', async (req: AuthRequest, res: Response) => {
+router.post('/conversations/:id/archive', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -272,17 +401,14 @@ router.put('/conversations/:id/archive', async (req: AuthRequest, res: Response)
       throw createError('Conversation not found', 404);
     }
 
-    const updatedConversation = await prisma.conversation.update({
+    await prisma.conversation.update({
       where: { id },
-      data: {
-        status: 'archived'
-      }
+      data: { status: 'archived' }
     });
 
     res.json({
       success: true,
-      message: 'Conversation archived',
-      data: updatedConversation
+      message: 'Conversation archived successfully'
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -293,7 +419,7 @@ router.put('/conversations/:id/archive', async (req: AuthRequest, res: Response)
 });
 
 // Unarchive conversation
-router.put('/conversations/:id/unarchive', async (req: AuthRequest, res: Response) => {
+router.post('/conversations/:id/unarchive', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -308,17 +434,14 @@ router.put('/conversations/:id/unarchive', async (req: AuthRequest, res: Respons
       throw createError('Conversation not found', 404);
     }
 
-    const updatedConversation = await prisma.conversation.update({
+    await prisma.conversation.update({
       where: { id },
-      data: {
-        status: 'active'
-      }
+      data: { status: 'active' }
     });
 
     res.json({
       success: true,
-      message: 'Conversation unarchived',
-      data: updatedConversation
+      message: 'Conversation unarchived successfully'
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -328,24 +451,89 @@ router.put('/conversations/:id/unarchive', async (req: AuthRequest, res: Respons
   }
 });
 
-// Get unread message count
+// Pin conversation
+router.post('/conversations/:id/pin', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id,
+        userId: req.user!.id
+      }
+    });
+
+    if (!conversation) {
+      throw createError('Conversation not found', 404);
+    }
+
+    await prisma.conversation.update({
+      where: { id },
+      data: { isPinned: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'Conversation pinned successfully'
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Unpin conversation
+router.post('/conversations/:id/unpin', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id,
+        userId: req.user!.id
+      }
+    });
+
+    if (!conversation) {
+      throw createError('Conversation not found', 404);
+    }
+
+    await prisma.conversation.update({
+      where: { id },
+      data: { isPinned: false }
+    });
+
+    res.json({
+      success: true,
+      message: 'Conversation unpinned successfully'
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get unread count
 router.get('/unread-count', async (req: AuthRequest, res: Response) => {
   try {
-    const unreadCount = await prisma.message.count({
+    const result = await prisma.conversation.aggregate({
       where: {
-        conversation: {
-          userId: req.user!.id,
-          status: 'active'
-        },
-        direction: 'inbound',
-        status: { not: 'read' }
+        userId: req.user!.id,
+        status: 'active'
+      },
+      _sum: {
+        unreadCount: true
       }
     });
 
     res.json({
       success: true,
       data: {
-        unreadCount
+        unreadCount: result._sum.unreadCount || 0
       }
     });
   } catch (error: any) {
@@ -359,35 +547,39 @@ router.get('/unread-count', async (req: AuthRequest, res: Response) => {
 // Search messages
 router.get('/search', async (req: AuthRequest, res: Response) => {
   try {
-    const query = req.query.q as string;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const { q, limit = '20' } = req.query;
 
-    if (!query) {
+    if (!q) {
       throw createError('Search query is required', 400);
     }
 
+    const limitNum = parseInt(limit as string);
+
     const messages = await prisma.message.findMany({
       where: {
-        conversation: {
-          userId: req.user!.id
-        },
+        userId: req.user!.id,
         content: {
-          contains: query,
+          contains: q as string,
           mode: 'insensitive'
         }
       },
       include: {
         conversation: {
           include: {
-            customer: true
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                phone: true
+              }
+            }
           }
-        },
-        template: true
+        }
       },
       orderBy: {
         createdAt: 'desc'
       },
-      take: limit
+      take: limitNum
     });
 
     res.json({
