@@ -8,213 +8,17 @@ import { WhatsAppService } from '../services/whatsapp';
 
 const router = Router();
 
-// Get WhatsApp credentials
-router.get('/whatsapp', async (req: AuthRequest, res: Response) => {
-  try {
-    const credentials = await prisma.whatsAppCredentials.findUnique({
-      where: {
-        userId: req.user!.id
-      },
-      select: {
-        id: true,
-        phoneNumberId: true,
-        businessId: true,
-        isActive: true,
-        webhookVerifyToken: true,
-        createdAt: true,
-        updatedAt: true
-        // Note: accessToken is intentionally excluded from response
-      }
-    });
-
-    if (!credentials) {
-      return res.json({
-        success: true,
-        data: null,
-        message: 'No WhatsApp credentials configured'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: credentials
-    });
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Update WhatsApp credentials
-router.post('/whatsapp', async (req: AuthRequest, res: Response) => {
-  try {
-    const validatedData = updateWhatsAppCredentialsSchema.parse(req.body);
-
-    // Encrypt the access token
-    const encryptedAccessToken = EncryptionService.encrypt(validatedData.accessToken);
-
-    // Test the credentials by making a simple API call
-    const whatsappService = new WhatsAppService();
-    
-    // Temporarily set credentials for testing
-    const testCredentials = {
-      accessToken: validatedData.accessToken,
-      phoneNumberId: validatedData.phoneNumberId,
-      businessId: validatedData.businessId,
-      webhookVerifyToken: validatedData.webhookVerifyToken
-    };
-
-    // Test connection (this would normally make a real API call)
-    const isValidConnection = await testWhatsAppConnection(testCredentials);
-
-    if (!isValidConnection) {
-      throw createError('Invalid WhatsApp credentials. Please verify your access token and phone number ID.', 400);
-    }
-
-    // Upsert credentials
-    const credentials = await prisma.whatsAppCredentials.upsert({
-      where: {
-        userId: req.user!.id
-      },
-      update: {
-        accessToken: encryptedAccessToken,
-        phoneNumberId: validatedData.phoneNumberId,
-        businessId: validatedData.businessId,
-        webhookVerifyToken: validatedData.webhookVerifyToken,
-        isActive: true,
-        updatedAt: new Date()
-      },
-      create: {
-        userId: req.user!.id,
-        accessToken: encryptedAccessToken,
-        phoneNumberId: validatedData.phoneNumberId,
-        businessId: validatedData.businessId,
-        webhookVerifyToken: validatedData.webhookVerifyToken,
-        isActive: true
-      },
-      select: {
-        id: true,
-        phoneNumberId: true,
-        businessId: true,
-        isActive: true,
-        webhookVerifyToken: true,
-        createdAt: true,
-        updatedAt: true
-      }
-    });
-
-    res.json({
-      success: true,
-      message: 'WhatsApp credentials updated successfully',
-      data: credentials
-    });
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: error.errors
-      });
-    }
-    res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Delete WhatsApp credentials
-router.delete('/whatsapp', async (req: AuthRequest, res: Response) => {
-  try {
-    const credentials = await prisma.whatsAppCredentials.findUnique({
-      where: {
-        userId: req.user!.id
-      }
-    });
-
-    if (!credentials) {
-      throw createError('WhatsApp credentials not found', 404);
-    }
-
-    await prisma.whatsAppCredentials.delete({
-      where: {
-        userId: req.user!.id
-      }
-    });
-
-    res.json({
-      success: true,
-      message: 'WhatsApp credentials deleted successfully'
-    });
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Test WhatsApp connection
-router.post('/whatsapp/test', async (req: AuthRequest, res: Response) => {
-  try {
-    const credentials = await prisma.whatsAppCredentials.findUnique({
-      where: {
-        userId: req.user!.id
-      }
-    });
-
-    if (!credentials) {
-      throw createError('WhatsApp credentials not found', 404);
-    }
-
-    const isValidConnection = await testWhatsAppConnection({
-      accessToken: EncryptionService.decrypt(credentials.accessToken),
-      phoneNumberId: credentials.phoneNumberId,
-      businessId: credentials.businessId,
-      webhookVerifyToken: credentials.webhookVerifyToken || undefined
-    });
-
-    if (isValidConnection) {
-      // Update last tested timestamp
-      await prisma.whatsAppCredentials.update({
-        where: {
-          userId: req.user!.id
-        },
-        data: {
-          updatedAt: new Date()
-        }
-      });
-    }
-
-    res.json({
-      success: true,
-      message: isValidConnection ? 'Connection test successful' : 'Connection test failed',
-      data: {
-        isValid: isValidConnection
-      }
-    });
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
 // Get user profile
 router.get('/profile', async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
-      where: {
-        id: req.user!.id
-      },
+      where: { id: req.user!.id },
       select: {
         id: true,
         email: true,
         firstName: true,
         lastName: true,
+        role: true,
         createdAt: true,
         updatedAt: true
       }
@@ -224,29 +28,9 @@ router.get('/profile', async (req: AuthRequest, res: Response) => {
       throw createError('User not found', 404);
     }
 
-    // Get account statistics
-    const stats = await Promise.all([
-      prisma.customer.count({ where: { userId: req.user!.id } }),
-      prisma.tag.count({ where: { userId: req.user!.id } }),
-      prisma.template.count({ where: { userId: req.user!.id } }),
-      prisma.campaign.count({ where: { userId: req.user!.id } }),
-      prisma.conversation.count({ where: { userId: req.user!.id } })
-    ]);
-
-    const [customerCount, tagCount, templateCount, campaignCount, conversationCount] = stats;
-
     res.json({
       success: true,
-      data: {
-        user,
-        stats: {
-          customers: customerCount,
-          tags: tagCount,
-          templates: templateCount,
-          campaigns: campaignCount,
-          conversations: conversationCount
-        }
-      }
+      data: user
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -261,7 +45,7 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
   try {
     const { firstName, lastName, email } = req.body;
 
-    // Check if email is already taken by another user
+    // Check if email is already taken
     if (email) {
       const existingUser = await prisma.user.findFirst({
         where: {
@@ -271,14 +55,12 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
       });
 
       if (existingUser) {
-        throw createError('Email is already taken', 400);
+        throw createError('Email is already in use', 400);
       }
     }
 
     const user = await prisma.user.update({
-      where: {
-        id: req.user!.id
-      },
+      where: { id: req.user!.id },
       data: {
         ...(firstName && { firstName }),
         ...(lastName && { lastName }),
@@ -289,7 +71,7 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
         email: true,
         firstName: true,
         lastName: true,
-        createdAt: true,
+        role: true,
         updatedAt: true
       }
     });
@@ -316,15 +98,9 @@ router.put('/password', async (req: AuthRequest, res: Response) => {
       throw createError('Current password and new password are required', 400);
     }
 
-    if (newPassword.length < 8) {
-      throw createError('New password must be at least 8 characters long', 400);
-    }
-
-    // Get current user with password
+    // Get user with password
     const user = await prisma.user.findUnique({
-      where: {
-        id: req.user!.id
-      }
+      where: { id: req.user!.id }
     });
 
     if (!user) {
@@ -332,24 +108,20 @@ router.put('/password', async (req: AuthRequest, res: Response) => {
     }
 
     // Verify current password
-    const bcrypt = require('bcryptjs');
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const bcrypt = await import('bcryptjs');
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
 
-    if (!isCurrentPasswordValid) {
-      throw createError('Current password is incorrect', 400);
+    if (!isPasswordValid) {
+      throw createError('Current password is incorrect', 401);
     }
 
     // Hash new password
-    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     // Update password
     await prisma.user.update({
-      where: {
-        id: req.user!.id
-      },
-      data: {
-        password: hashedNewPassword
-      }
+      where: { id: req.user!.id },
+      data: { password: hashedPassword }
     });
 
     res.json({
@@ -364,23 +136,240 @@ router.put('/password', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Helper function to test WhatsApp connection
-async function testWhatsAppConnection(credentials: any): Promise<boolean> {
+// Get WhatsApp credentials
+router.get('/whatsapp', async (req: AuthRequest, res: Response) => {
   try {
-    // This is a simplified test - in reality, you'd make a real API call to WhatsApp
-    // For now, we'll just check if the credentials are properly formatted
-    
-    if (!credentials.accessToken || !credentials.phoneNumberId) {
-      return false;
+    const credentials = await prisma.whatsAppCredentials.findUnique({
+      where: { userId: req.user!.id }
+    });
+
+    if (!credentials) {
+      return res.json({
+        success: true,
+        data: null
+      });
     }
 
-    // Additional validation logic would go here
-    // For example, making a test API call to WhatsApp's Graph API
-    
-    return true; // Simplified for demo purposes
-  } catch (error) {
-    return false;
+    // Return credentials without sensitive data
+    res.json({
+      success: true,
+      data: {
+        id: credentials.id,
+        phoneNumberId: credentials.phoneNumberId,
+        businessId: credentials.businessId,
+        phoneNumber: credentials.phoneNumber,
+        displayName: credentials.displayName,
+        qualityRating: credentials.qualityRating,
+        messagingLimit: credentials.messagingLimit,
+        isActive: credentials.isActive,
+        lastVerifiedAt: credentials.lastVerifiedAt,
+        createdAt: credentials.createdAt,
+        updatedAt: credentials.updatedAt
+      }
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
   }
-}
+});
+
+// Update WhatsApp credentials
+router.post('/whatsapp', async (req: AuthRequest, res: Response) => {
+  try {
+    const validatedData = updateWhatsAppCredentialsSchema.parse(req.body);
+
+    // Encrypt access token
+    const encryptedToken = EncryptionService.encrypt(validatedData.accessToken);
+
+    // Test the credentials
+    const whatsappService = new WhatsAppService();
+    const testResult = await whatsappService.sendTextMessage(
+      req.user!.id,
+      '+1234567890', // Test number
+      'Test message'
+    );
+
+    // If test fails with credentials error, don't save
+    if (!testResult.success && testResult.error?.includes('credentials')) {
+      throw createError('Invalid WhatsApp credentials', 400);
+    }
+
+    // Upsert credentials
+    const credentials = await prisma.whatsAppCredentials.upsert({
+      where: { userId: req.user!.id },
+      update: {
+        accessToken: encryptedToken,
+        phoneNumberId: validatedData.phoneNumberId,
+        businessId: validatedData.businessId,
+        webhookVerifyToken: validatedData.webhookVerifyToken,
+        isActive: true,
+        lastVerifiedAt: new Date()
+      },
+      create: {
+        userId: req.user!.id,
+        accessToken: encryptedToken,
+        phoneNumberId: validatedData.phoneNumberId,
+        businessId: validatedData.businessId,
+        webhookVerifyToken: validatedData.webhookVerifyToken,
+        isActive: true,
+        lastVerifiedAt: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'WhatsApp credentials saved successfully',
+      data: {
+        id: credentials.id,
+        phoneNumberId: credentials.phoneNumberId,
+        businessId: credentials.businessId,
+        isActive: credentials.isActive,
+        lastVerifiedAt: credentials.lastVerifiedAt
+      }
+    });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors
+      });
+    }
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Delete WhatsApp credentials
+router.delete('/whatsapp', async (req: AuthRequest, res: Response) => {
+  try {
+    const credentials = await prisma.whatsAppCredentials.findUnique({
+      where: { userId: req.user!.id }
+    });
+
+    if (!credentials) {
+      throw createError('WhatsApp credentials not found', 404);
+    }
+
+    await prisma.whatsAppCredentials.delete({
+      where: { userId: req.user!.id }
+    });
+
+    res.json({
+      success: true,
+      message: 'WhatsApp credentials removed successfully'
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Test WhatsApp connection
+router.post('/whatsapp/test', async (req: AuthRequest, res: Response) => {
+  try {
+    const credentials = await prisma.whatsAppCredentials.findUnique({
+      where: { userId: req.user!.id }
+    });
+
+    if (!credentials) {
+      throw createError('WhatsApp credentials not configured', 400);
+    }
+
+    const whatsappService = new WhatsAppService();
+    
+    // Get phone number info from WhatsApp API
+    const decryptedToken = EncryptionService.decrypt(credentials.accessToken);
+    
+    // Test by getting phone number info
+    const axios = await import('axios');
+    const response = await axios.default.get(
+      `https://graph.facebook.com/v17.0/${credentials.phoneNumberId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${decryptedToken}`
+        }
+      }
+    );
+
+    // Update credentials with latest info
+    await prisma.whatsAppCredentials.update({
+      where: { userId: req.user!.id },
+      data: {
+        phoneNumber: response.data.display_phone_number,
+        displayName: response.data.verified_name,
+        qualityRating: response.data.quality_rating,
+        lastVerifiedAt: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'WhatsApp connection test successful',
+      data: {
+        phoneNumber: response.data.display_phone_number,
+        displayName: response.data.verified_name,
+        qualityRating: response.data.quality_rating
+      }
+    });
+  } catch (error: any) {
+    console.error('WhatsApp test error:', error.response?.data || error.message);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.response?.data?.error?.message || error.message || 'Connection test failed'
+    });
+  }
+});
+
+// Get account stats
+router.get('/stats', async (req: AuthRequest, res: Response) => {
+  try {
+    const [
+      totalCustomers,
+      totalConversations,
+      totalMessages,
+      totalTemplates,
+      totalCampaigns,
+      totalTags,
+      whatsappCredentials
+    ] = await Promise.all([
+      prisma.customer.count({ where: { userId: req.user!.id } }),
+      prisma.conversation.count({ where: { userId: req.user!.id } }),
+      prisma.message.count({ where: { userId: req.user!.id } }),
+      prisma.template.count({ where: { userId: req.user!.id } }),
+      prisma.campaign.count({ where: { userId: req.user!.id } }),
+      prisma.tag.count({ where: { userId: req.user!.id } }),
+      prisma.whatsAppCredentials.findUnique({
+        where: { userId: req.user!.id },
+        select: { isActive: true, lastVerifiedAt: true }
+      })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        customers: totalCustomers,
+        conversations: totalConversations,
+        messages: totalMessages,
+        templates: totalTemplates,
+        campaigns: totalCampaigns,
+        tags: totalTags,
+        whatsappConnected: whatsappCredentials?.isActive || false,
+        lastVerifiedAt: whatsappCredentials?.lastVerifiedAt
+      }
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 export default router;

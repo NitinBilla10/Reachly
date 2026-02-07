@@ -1,363 +1,209 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Pencil, Plus, Sparkles } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { 
+  MessageSquareText, 
+  Plus, 
+  Loader2, 
+  MoreHorizontal, 
+  Edit, 
+  Trash2,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Copy
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Badge } from '@/components/ui/badge'
 import { templatesAPI } from '@/lib/api'
+import toast from 'react-hot-toast'
 
-interface TemplateItem {
+interface Template {
   id: string
   name: string
-  category: 'marketing' | 'utility' | 'authentication'
+  category: string
+  language: string
   content: string
   status: string
-  variables?: string[] | null
-  language?: string
+  variables?: string[]
+  createdAt: string
 }
 
-const categoryOptions: Array<TemplateItem['category']> = [
-  'marketing',
-  'utility',
-  'authentication',
-]
+const statusConfig = {
+  draft: { icon: Clock, color: 'text-muted-foreground', bg: 'bg-muted', label: 'Draft' },
+  pending: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10', label: 'Pending' },
+  approved: { icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-500/10', label: 'Approved' },
+  rejected: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', label: 'Rejected' },
+}
+
+const categoryConfig = {
+  marketing: { color: 'bg-blue-500', label: 'Marketing' },
+  utility: { color: 'bg-purple-500', label: 'Utility' },
+  authentication: { color: 'bg-orange-500', label: 'Authentication' },
+}
 
 export default function TemplatesPage() {
-  const [templates, setTemplates] = useState<TemplateItem[]>([])
+  const router = useRouter()
+  const [templates, setTemplates] = useState<Template[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
-  const [formState, setFormState] = useState({
-    name: '',
-    category: 'marketing' as TemplateItem['category'],
-    language: 'en_US',
-    content: '',
-  })
-  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null)
-  const [previewVariables, setPreviewVariables] = useState<Record<string, string>>({})
-  const [previewResult, setPreviewResult] = useState<string | null>(null)
-  const [previewError, setPreviewError] = useState<string | null>(null)
 
-  const fetchTemplates = async () => {
+  useEffect(() => {
+    loadTemplates()
+  }, [])
+
+  const loadTemplates = async () => {
     try {
       setIsLoading(true)
       const response = await templatesAPI.getAll()
       setTemplates(response.data.data)
-      setError(null)
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to load templates.')
+    } catch (error) {
+      toast.error('Failed to load templates')
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchTemplates()
-  }, [])
-
-  useEffect(() => {
-    if (!previewTemplateId) {
-      setPreviewVariables({})
-      setPreviewResult(null)
-      setPreviewError(null)
-    }
-  }, [previewTemplateId])
-
-  const activeTemplate = useMemo(
-    () => templates.find((template) => template.id === editingTemplateId) || null,
-    [editingTemplateId, templates]
-  )
-
-  useEffect(() => {
-    if (activeTemplate) {
-      setFormState({
-        name: activeTemplate.name,
-        category: activeTemplate.category,
-        language: activeTemplate.language || 'en_US',
-        content: activeTemplate.content,
-      })
-    } else {
-      setFormState({
-        name: '',
-        category: 'marketing',
-        language: 'en_US',
-        content: '',
-      })
-    }
-  }, [activeTemplate])
-
-  const handleSubmit = async () => {
-    if (!formState.name.trim() || !formState.content.trim()) {
-      setError('Template name and content are required.')
-      return
-    }
-
+  const handleDelete = async (id: string) => {
     try {
-      setIsSubmitting(true)
-      if (editingTemplateId) {
-        const response = await templatesAPI.update(editingTemplateId, {
-          name: formState.name.trim(),
-          category: formState.category,
-          language: formState.language.trim() || 'en_US',
-          content: formState.content.trim(),
-        })
-        setTemplates((prev) =>
-          prev.map((template) =>
-            template.id === editingTemplateId ? response.data.data : template
-          )
-        )
-      } else {
-        const response = await templatesAPI.create({
-          name: formState.name.trim(),
-          category: formState.category,
-          language: formState.language.trim() || 'en_US',
-          content: formState.content.trim(),
-        })
-        setTemplates((prev) => [response.data.data, ...prev])
-      }
-      setEditingTemplateId(null)
-      setError(null)
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Unable to save template.')
-    } finally {
-      setIsSubmitting(false)
+      await templatesAPI.delete(id)
+      toast.success('Template deleted successfully')
+      loadTemplates()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete template')
     }
   }
 
-  const handlePreview = async () => {
-    if (!previewTemplateId) return
-
-    try {
-      setPreviewError(null)
-      const response = await templatesAPI.preview(previewTemplateId, previewVariables)
-      setPreviewResult(response.data.data.previewContent)
-    } catch (err: any) {
-      setPreviewError(err?.response?.data?.error || 'Preview failed.')
-    }
+  const extractVariables = (content: string) => {
+    const matches = content.match(/{{(\w+)}}/g) || []
+    return matches.map(m => m.replace(/[{}]/g, ''))
   }
-
-  const previewTemplate = templates.find((template) => template.id === previewTemplateId) || null
-  const previewKeys = previewTemplate?.variables || []
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Templates</h1>
+          <h1 className="text-2xl font-semibold">Message Templates</h1>
           <p className="text-muted-foreground">
-            Build WhatsApp templates with variables and categories.
+            Create and manage WhatsApp message templates
           </p>
         </div>
+        <Button onClick={() => router.push('/dashboard/templates/new')}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create Template
+        </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-4 w-4 text-primary" />
-              {editingTemplateId ? 'Edit template' : 'New template'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="template-name">Template name</Label>
-              <Input
-                id="template-name"
-                placeholder="Order Confirmation"
-                value={formState.name}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, name: event.target.value }))
-                }
-              />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <MessageSquareText className="h-5 w-5" />
+            All Templates
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Select
-                  value={formState.category}
-                  onValueChange={(value) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      category: value as TemplateItem['category'],
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categoryOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="template-language">Language</Label>
-                <Input
-                  id="template-language"
-                  placeholder="en_US"
-                  value={formState.language}
-                  onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, language: event.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="template-content">Template content</Label>
-              <Textarea
-                id="template-content"
-                placeholder="Hi {{name}}, your order {{order_id}} is confirmed."
-                className="min-h-[140px]"
-                value={formState.content}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, content: event.target.value }))
-                }
-              />
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting
-                  ? editingTemplateId
-                    ? 'Saving...'
-                    : 'Creating...'
-                  : editingTemplateId
-                  ? 'Save changes'
-                  : 'Create template'}
-              </Button>
-              {editingTemplateId && (
-                <Button variant="ghost" onClick={() => setEditingTemplateId(null)}>
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Template preview
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {previewTemplate ? (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium">{previewTemplate.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {previewTemplate.content}
-                  </p>
-                </div>
-                {previewKeys.length > 0 ? (
-                  <div className="space-y-3">
-                    {previewKeys.map((key) => (
-                      <div key={key} className="space-y-1">
-                        <Label htmlFor={`preview-${key}`}>{key}</Label>
-                        <Input
-                          id={`preview-${key}`}
-                          value={previewVariables[key] || ''}
-                          onChange={(event) =>
-                            setPreviewVariables((prev) => ({
-                              ...prev,
-                              [key]: event.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    This template has no variables to replace.
-                  </p>
-                )}
-                {previewError && (
-                  <p className="text-sm text-destructive">{previewError}</p>
-                )}
-                <Button onClick={handlePreview}>Generate preview</Button>
-                {previewResult && (
-                  <Card className="border-dashed p-4">
-                    <p className="text-sm font-medium">Preview output</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {previewResult}
-                    </p>
-                  </Card>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Select a template to preview the message with variables.
+          ) : templates.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <MessageSquareText className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold">No templates yet</h3>
+              <p className="text-muted-foreground max-w-sm">
+                Create message templates for your campaigns and quick replies.
               </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <Button className="mt-4" onClick={() => router.push('/dashboard/templates/new')}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Template
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {templates.map((template) => {
+                const status = statusConfig[template.status as keyof typeof statusConfig] || statusConfig.draft
+                const category = categoryConfig[template.category as keyof typeof categoryConfig] || { color: 'bg-gray-500', label: template.category }
+                const StatusIcon = status.icon
+                const variables = extractVariables(template.content)
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading templates...</p>
-        ) : templates.length === 0 ? (
-          <Card className="border-dashed p-6 text-sm text-muted-foreground">
-            No templates yet. Create one to start building campaigns.
-          </Card>
-        ) : (
-          templates.map((template) => (
-            <Card key={template.id}>
-              <CardHeader className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    {template.name}
-                  </CardTitle>
-                  <Badge
-                    variant={template.status === 'approved' ? 'success' : 'warning'}
+                return (
+                  <div
+                    key={template.id}
+                    className="flex items-start justify-between p-4 rounded-lg border hover:border-primary/50 transition-colors"
                   >
-                    {template.status}
-                  </Badge>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant="secondary">{template.category}</Badge>
-                  {template.variables && template.variables.length > 0 && (
-                    <Badge variant="outline">{template.variables.length} vars</Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{template.content}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPreviewTemplateId(template.id)}
-                  >
-                    Preview
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingTemplateId(template.id)}
-                  >
-                    <Pencil className="mr-2 h-3 w-3" />
-                    Edit
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold">{template.name}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {template.language}
+                        </Badge>
+                        <Badge className={`${category.color} text-white text-xs`}>
+                          {category.label}
+                        </Badge>
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${status.bg}`}>
+                          <StatusIcon className={`h-3 w-3 ${status.color}`} />
+                          <span className={status.color}>{status.label}</span>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                        {template.content}
+                      </p>
+                      {variables.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {variables.map((variable, index) => (
+                            <code key={index} className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                              {'{{'}{variable}{'}}'}
+                            </code>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="ml-4">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => router.push(`/dashboard/templates/${template.id}`)}>
+                          <Copy className="mr-2 h-4 w-4" />
+                          Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/dashboard/templates/${template.id}/edit`)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        {template.status === 'draft' && (
+                          <DropdownMenuItem onClick={() => templatesAPI.sync(template.id)}>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Sync with WhatsApp
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDelete(template.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
