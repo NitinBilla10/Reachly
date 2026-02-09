@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../services/database';
 import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
+import { MetricsService } from '../services/metrics';
 
 const router = Router();
 
@@ -451,6 +452,92 @@ router.get('/templates', async (req: AuthRequest, res: Response) => {
       data: {
         templates,
         popularTemplates: templateStats
+      }
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get enhanced dashboard metrics
+router.get('/enhanced-metrics', async (req: AuthRequest, res: Response) => {
+  try {
+    const { period = '30d' } = req.query;
+
+    const metrics = await MetricsService.getDashboardMetrics(req.user!.id, period as string);
+
+    res.json({
+      success: true,
+      data: metrics
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get window compliance metrics
+router.get('/window-compliance', async (req: AuthRequest, res: Response) => {
+  try {
+    const { period = '30d' } = req.query;
+    const startDate = getStartDate(period as string);
+
+    // Get messages sent outside business hours
+    const messagesWithSchedule = await prisma.campaignMessage.findMany({
+      where: {
+        campaign: {
+          userId: req.user!.id,
+          schedule: {
+            isNot: null
+          }
+        },
+        sentAt: {
+          gte: startDate
+        }
+      },
+      include: {
+        campaign: {
+          include: {
+            schedule: true
+          }
+        }
+      }
+    });
+
+    let withinWindow = 0;
+    let outsideWindow = 0;
+
+    messagesWithSchedule.forEach(message => {
+      if (message.sentAt && message.campaign.schedule) {
+        const sentTime = message.sentAt.toTimeString().slice(0, 5);
+        const windowStart = message.campaign.schedule.windowStart;
+        const windowEnd = message.campaign.schedule.windowEnd;
+
+        if (windowStart && windowEnd) {
+          if (sentTime >= windowStart && sentTime <= windowEnd) {
+            withinWindow++;
+          } else {
+            outsideWindow++;
+          }
+        }
+      }
+    });
+
+    const total = withinWindow + outsideWindow;
+    const complianceRate = total > 0 ? (withinWindow / total * 100).toFixed(2) : 100;
+
+    res.json({
+      success: true,
+      data: {
+        withinWindow,
+        outsideWindow,
+        total,
+        complianceRate: parseFloat(complianceRate)
       }
     });
   } catch (error: any) {

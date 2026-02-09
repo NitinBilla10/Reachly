@@ -5,6 +5,7 @@ import { sendMessageSchema } from '../validation/common';
 import { AuthRequest } from '../middleware/auth';
 import { WhatsAppService } from '../services/whatsapp';
 import { getSocketService } from '../services/socket';
+import { MetricsService } from '../services/metrics';
 
 const router = Router();
 
@@ -186,6 +187,9 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
     if (socketService) {
       socketService.emitNewMessage(validatedData.conversationId, message);
     }
+
+    // Record metrics
+    await MetricsService.recordMessageSent('outbound');
 
     res.status(201).json({
       success: true,

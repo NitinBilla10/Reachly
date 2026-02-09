@@ -3,8 +3,8 @@ import { prisma } from '../services/database';
 import { createError } from '../middleware/errorHandler';
 import { createCampaignSchema } from '../validation/common';
 import { AuthRequest } from '../middleware/auth';
-import { WhatsAppService } from '../services/whatsapp';
-import { getSocketService } from '../services/socket';
+import { startCampaign, cancelCampaign as cancelCampaignQueue } from '../services/campaignQueue';
+import { AuditLogService } from '../services/auditLog';
 
 const router = Router();
 
@@ -137,6 +137,29 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       }
     });
 
+    // Create campaign schedule if settings provided
+    if (req.body.schedule) {
+      await prisma.campaignSchedule.create({
+        data: {
+          campaignId: campaign.id,
+          timezone: req.body.schedule.timezone || 'UTC',
+          throttleRate: req.body.schedule.throttleRate || 10,
+          retryAttempts: req.body.schedule.retryAttempts || 3,
+          retryDelay: req.body.schedule.retryDelay || 60,
+          windowStart: req.body.schedule.windowStart || null,
+          windowEnd: req.body.schedule.windowEnd || null
+        }
+      });
+    }
+
+    // Audit log
+    await AuditLogService.logCampaignCreated(
+      req.user!.id,
+      campaign.id,
+      campaign,
+      req
+    );
+
     res.status(201).json({
       success: true,
       message: 'Campaign created successfully',
@@ -245,8 +268,16 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
       })
     );
 
-    // Start sending messages asynchronously
-    processCampaignMessages(campaign.id, req.user!.id);
+    // Start campaign using queue system
+    await startCampaign(id, req.user!.id);
+
+    // Audit log
+    await AuditLogService.logCampaignSent(
+      req.user!.id,
+      id,
+      { totalMessages: campaignMessages.length },
+      req
+    );
 
     res.json({
       success: true,
@@ -301,17 +332,20 @@ router.put('/:id/cancel', async (req: AuthRequest, res: Response) => {
     await prisma.campaign.update({
       where: { id },
       data: {
-        status: 'failed'
+        status: 'cancelled'
       }
     });
 
-    // Emit real-time update
-    const socketService = getSocketService();
-    if (socketService) {
-      socketService.emitCampaignUpdate(req.user!.id, id, {
-        type: 'cancelled'
-      });
-    }
+    // Cancel queued jobs
+    await cancelCampaignQueue(id);
+
+    // Audit log
+    await AuditLogService.logCampaignCancelled(
+      req.user!.id,
+      id,
+      'User cancelled campaign',
+      req
+    );
 
     res.json({
       success: true,
@@ -380,113 +414,48 @@ router.get('/:id/analytics', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Helper function to process campaign messages
-async function processCampaignMessages(campaignId: string, userId: string) {
+// Get campaign logs
+router.get('/:id/logs', async (req: AuthRequest, res: Response) => {
   try {
-    const whatsappService = new WhatsAppService();
-    const socketService = getSocketService();
+    const { id } = req.params;
+    const { limit = '50', offset = '0' } = req.query;
 
-    const campaignMessages = await prisma.campaignMessage.findMany({
+    const campaign = await prisma.campaign.findFirst({
       where: {
-        campaignId,
-        status: 'pending'
-      },
-      include: {
-        customer: true
+        id,
+        userId: req.user!.id
       }
     });
 
-    let sentCount = 0;
-    let deliveredCount = 0;
-    let failedCount = 0;
-
-    for (const message of campaignMessages) {
-      try {
-        // Send message via WhatsApp API
-        const result = await whatsappService.sendTemplateMessage(
-          userId,
-          message.customer.phone,
-          '', // Template name would come from template
-          'en_US'
-        );
-
-        if (result.success) {
-          await prisma.campaignMessage.update({
-            where: { id: message.id },
-            data: {
-              status: 'sent',
-              sentAt: new Date(),
-              whatsappMessageId: result.messageId
-            }
-          });
-          sentCount++;
-        } else {
-          await prisma.campaignMessage.update({
-            where: { id: message.id },
-            data: {
-              status: 'failed',
-              failedAt: new Date(),
-              error: result.error
-            }
-          });
-          failedCount++;
-        }
-
-        // Emit real-time update
-        if (socketService) {
-          socketService.emitCampaignUpdate(userId, campaignId, {
-            type: 'message_sent',
-            messageId: message.id,
-            status: result.success ? 'sent' : 'failed'
-          });
-        }
-
-        // Rate limiting - wait 1 second between messages
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        await prisma.campaignMessage.update({
-          where: { id: message.id },
-          data: {
-            status: 'failed',
-            failedAt: new Date(),
-            error: 'Failed to send message'
-          }
-        });
-        failedCount++;
-      }
+    if (!campaign) {
+      throw createError('Campaign not found', 404);
     }
 
-    // Update campaign with final counts
-    await prisma.campaign.update({
-      where: { id: campaignId },
+    const [logs, total] = await Promise.all([
+      prisma.campaignLog.findMany({
+        where: { campaignId: id },
+        orderBy: { createdAt: 'desc' },
+        take: parseInt(limit as string),
+        skip: parseInt(offset as string)
+      }),
+      prisma.campaignLog.count({
+        where: { campaignId: id }
+      })
+    ]);
+
+    res.json({
+      success: true,
       data: {
-        status: 'completed',
-        completedAt: new Date(),
-        sentMessages: sentCount,
-        failedMessages: failedCount
+        logs,
+        total
       }
     });
-
-    // Emit final campaign update
-    if (socketService) {
-      socketService.emitCampaignUpdate(userId, campaignId, {
-        type: 'completed',
-        sentCount,
-        failedCount,
-        deliveredCount
-      });
-    }
-  } catch (error) {
-    console.error('Campaign processing error:', error);
-    
-    // Mark campaign as failed
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: {
-        status: 'failed'
-      }
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
     });
   }
-}
+});
 
 export default router;
