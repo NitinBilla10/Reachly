@@ -127,7 +127,7 @@ model Campaign {
   name        String
   description String?
   templateId  String
-  status      String   @default("draft") // draft, sending, completed, failed
+  status      String   @default("draft") // draft, scheduled, sending, completed, failed, cancelled
   totalMessages Int     @default(0)
   sentMessages  Int     @default(0)
   deliveredMessages Int @default(0)
@@ -142,6 +142,7 @@ model Campaign {
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   template           Template            @relation(fields: [templateId], references: [id])
   campaignMessages   CampaignMessage[]
+  schedule           CampaignSchedule?
 
   @@map("campaigns")
 }
@@ -178,6 +179,7 @@ model Conversation {
   userId     String
   customerId String
   status     String   @default("active") // active, archived
+  isPinned   Boolean  @default(false)
   lastMessageAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -186,6 +188,8 @@ model Conversation {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   customer Customer  @relation(fields: [customerId], references: [id])
   messages Message[]
+  notes    ConversationNote[]
+  labels   ConversationLabelAssignment[]
 
   @@unique([userId, customerId])
   @@map("conversations")
@@ -216,4 +220,108 @@ model Message {
   template     Template?    @relation(fields: [templateId], references: [id])
 
   @@map("messages")
+}
+
+model ConversationNote {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  content        String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("conversation_notes")
+}
+
+model ConversationLabel {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  color     String   @default("#8B5CF6")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  conversations ConversationLabelAssignment[]
+
+  @@unique([userId, name])
+  @@map("conversation_labels")
+}
+
+model ConversationLabelAssignment {
+  conversationId String
+  labelId        String
+  createdAt      DateTime @default(now())
+
+  // Relations
+  conversation Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  label        ConversationLabel  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, labelId])
+  @@map("conversation_label_assignments")
+}
+
+model CampaignSchedule {
+  id                String    @id @default(cuid())
+  campaignId        String    @unique
+  timezone          String    @default("UTC")
+  throttleRate      Int       @default(10) // Messages per minute
+  retryAttempts     Int       @default(3)
+  retryDelay        Int       @default(60) // Seconds
+  windowStart       String?   // HH:MM format
+  windowEnd         String?   // HH:MM format
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_schedules")
+}
+
+model CampaignLog {
+  id         String   @id @default(cuid())
+  campaignId String
+  messageId  String?
+  eventType  String   // started, message_sent, message_failed, message_retry, completed, cancelled
+  eventData  Json?
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([createdAt])
+  @@map("campaign_logs")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String   // campaign_created, campaign_sent, campaign_cancelled, customer_deleted, settings_updated, etc.
+  entityType String   // campaign, customer, template, settings, etc.
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  metadata   Json?    // Additional context
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemMetric {
+  id        String   @id @default(cuid())
+  metricType String  // messages_per_hour, active_users, campaign_throughput, api_response_time, etc.
+  value     Float
+  metadata  Json?
+  timestamp DateTime @default(now())
+
+  @@index([metricType])
+  @@index([timestamp])
+  @@map("system_metrics")
 }

@@ -28,8 +28,11 @@ out/
 Thumbs.db
 
 # Logs
-logs
+logs/
 *.log
+!logs/.gitkeep
+backend/logs/*.log
+!backend/logs/.gitkeep
 
 # Runtime data
 pids
