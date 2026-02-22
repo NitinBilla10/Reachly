@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { prisma } from '../services/database';
 import { WhatsAppService } from '../services/whatsapp';
 import { getSocketService } from '../services/socket';

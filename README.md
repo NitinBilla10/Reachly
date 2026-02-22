@@ -1,745 +1,508 @@
-# Reachly - WhatsApp Business API SaaS Platform
+# Reachly - WhatsApp Business API CRM Platform
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-43853D?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+A full-stack WhatsApp Business API CRM platform that helps businesses manage customer communications, send bulk messages, and track campaign performance.
 
-Reachly is a comprehensive SaaS platform that allows businesses to send and manage WhatsApp Business API messages to their customers. Built with modern web technologies, it provides a complete solution for customer communication, marketing campaigns, and analytics.
+## 🚀 Features
 
-## 🚀 Project Overview
+- **WhatsApp Business API Integration** - Connect and manage your WhatsApp Business API credentials
+- **Customer Management** - Organize customers with tags, notes, and detailed profiles
+- **Bulk Messaging** - Send personalized messages to thousands of customers instantly
+- **Template Management** - Create and manage WhatsApp message templates with variables
+- **Campaign Analytics** - Track message delivery, engagement, and campaign performance
+- **Real-time Chat** - Shared inbox for managing conversations in real-time
+- **Message Templates** - Create reusable message templates with dynamic variables
+- **Tag System** - Organize customers into segments for targeted messaging
+- **Dashboard Analytics** - Comprehensive analytics and reporting
+- **Multi-user Support** - Team collaboration with role-based access
 
-Reachly is a production-grade SaaS application that enables businesses to:
-
-- **Connect WhatsApp Business API** - Securely integrate and manage WhatsApp Business credentials
-- **Customer Management** - Organize customers with detailed profiles, tags, and notes
-- **Template System** - Create and manage WhatsApp message templates with variables
-- **Bulk Messaging** - Send targeted campaigns to customer segments using tags
-- **Real-time Chat** - Shared inbox interface for customer conversations
-- **Analytics Dashboard** - Track message delivery, engagement, and campaign performance
-- **Multi-tenant Architecture** - Complete data isolation between user accounts
-
-## 🛠️ Tech Stack
+## 🛠 Tech Stack
 
 ### Frontend
 - **Next.js 16** - React framework with App Router
 - **TypeScript** - Type-safe development
-- **Tailwind CSS 4** - Utility-first CSS framework
-- **shadcn/ui** - Modern React component library
-- **Radix UI** - Accessible component primitives
-- **Framer Motion** - Animation library
-- **Recharts** - Chart library for analytics
-- **React Query** - Server state management
-- **Zustand** - Client state management
-- **React Hook Form** - Form handling with validation
+- **Tailwind CSS** - Utility-first CSS framework
+- **Radix UI** - Accessible UI components
+- **Socket.io Client** - Real-time communication
+- **Axios** - HTTP client
+- **React Query** - Data fetching and caching
+- **Recharts** - Charts and analytics
+- **Framer Motion** - Animations
 
 ### Backend
 - **Node.js** - JavaScript runtime
-- **Express.js** - Web application framework
+- **Express** - Web framework
 - **TypeScript** - Type-safe development
-- **Prisma** - Database ORM
-- **PostgreSQL** - Primary database
-- **Socket.IO** - Real-time communication
-- **JWT** - Authentication tokens
+- **Prisma** - ORM for database operations
+- **PostgreSQL** - Relational database
+- **Socket.io** - Real-time WebSocket communication
+- **JWT** - Authentication
 - **bcryptjs** - Password hashing
-- **Zod** - Schema validation
+- **Zod** - Input validation
 
-### Security & Infrastructure
-- **AES Encryption** - WhatsApp credentials encryption
-- **Rate Limiting** - API protection
-- **Helmet.js** - Security headers
-- **CORS** - Cross-origin resource sharing
-- **HTTPS Only Cookies** - Secure cookie handling
+### DevOps
+- **Docker** - Containerization
+- **Docker Compose** - Multi-container orchestration
+- **PostgreSQL 15** - Database
 
-### Deployment
-- **Frontend** - Vercel
-- **Backend** - Render/Railway/Fly.io
-- **Database** - Managed PostgreSQL (Supabase/Neon/RDS)
-
-## 📋 Features
-
-### 🔐 Authentication & Security
-- JWT-based authentication
-- Password hashing with bcrypt
-- Role-based access control (User level)
-- Secure session management
-- Multi-tenant data isolation
-- Encrypted WhatsApp credentials storage
-
-### 👥 Customer Management (Mini CRM)
-- Add/edit/delete customers
-- Customer profiles with:
-  - Name, phone number, email
-  - Custom notes
-  - Tag assignments
-- Phone number validation (international format)
-- Search and filter customers
-- Import/export capabilities
-
-### 🏷️ Tagging System
-- Create custom tags with colors
-- Assign multiple tags to customers
-- Filter customers by tags
-- Tag-based campaign targeting
-- Tag analytics and usage statistics
-
-### 📝 Template Management
-- WhatsApp template creation and management
-- Variable support (e.g., `{{name}}`, `{{order_id}}`)
-- Template categories:
-  - Marketing
-  - Utility
-  - Authentication
-- Multi-language support
-- Template preview with variables
-- WhatsApp API sync (pending approval)
-
-### 📢 Bulk Messaging Campaigns
-- Create campaigns with templates
-- Target customers by tags
-- Personalized message variables
-- Campaign scheduling
-- Real-time progress tracking
-- Delivery status monitoring
-- Campaign analytics and reporting
-
-### 💬 Real-time Chat Inbox
-- WhatsApp-style chat interface
-- Real-time message synchronization
-- Typing indicators
-- Message status updates
-- Conversation management
-- Search through conversations
-- File attachment support
-
-### 📊 Analytics Dashboard
-- Message delivery rates
-- Campaign performance metrics
-- Customer engagement analytics
-- Response time tracking
-- Template usage statistics
-- Interactive charts and graphs
-
-### ⚙️ Settings Management
-- WhatsApp API credentials management
-- User profile settings
-- Webhook configuration
-- API testing and validation
-- Security settings
-
-## 🏗️ Architecture
+## 📁 Project Structure
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │    Backend      │    │   Database      │
-│   (Next.js)     │◄──►│   (Express)     │◄──►│  (PostgreSQL)   │
-│                 │    │                 │    │                 │
-│ • Dashboard     │    │ • REST API      │    │ • User Data     │
-│ • Chat UI       │    │ • WebSocket     │    │ • Messages      │
-│ • Analytics     │    │ • Webhooks      │    │ • Customers     │
-│ • Settings      │    │ • Auth          │    │ • Templates     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐              
-│   WhatsApp      │    │   Deployment    │              
-│   Business API  │    │                 │              
-│                 │    │ • Vercel        │              
-│ • Send Messages │    │ • Render        │              
-│ • Webhooks      │    │ • Supabase      │              
-│ • Templates     │    │                 │              
-└─────────────────┘    └─────────────────┘              
+reachly/
+├── frontend/                 # Next.js frontend application
+│   ├── src/
+│   │   ├── app/              # Next.js App Router pages
+│   │   │   ├── auth/         # Authentication pages
+│   │   │   │   ├── login/    # Login page
+│   │   │   │   └── signup/   # Signup page
+│   │   │   ├── dashboard/    # Dashboard pages
+│   │   │   │   ├── analytics/
+│   │   │   │   ├── campaigns/
+│   │   │   │   ├── customers/
+│   │   │   │   ├── inbox/
+│   │   │   │   ├── settings/
+│   │   │   │   ├── tags/
+│   │   │   │   └── templates/
+│   │   │   ├── globals.css   # Global styles
+│   │   │   ├── layout.tsx    # Root layout
+│   │   │   └── page.tsx      # Landing page
+│   │   ├── components/       # React components
+│   │   │   ├── layout/       # Layout components
+│   │   │   │   ├── sidebar.tsx
+│   │   │   │   └── topbar.tsx
+│   │   │   └── ui/           # UI components (Radix UI)
+│   │   ├── lib/              # Utility functions
+│   │   │   ├── api.ts        # API client
+│   │   │   ├── socket.ts     # WebSocket client
+│   │   │   └── utils.ts      # Helper functions
+│   │   └── providers.tsx      # React providers
+│   ├── .env                  # Environment variables
+│   ├── .env.example          # Environment variables template
+│   ├── next.config.js        # Next.js configuration
+│   ├── tailwind.config.js   # Tailwind CSS configuration
+│   └── package.json          # Dependencies
+│
+├── backend/                  # Express backend API
+│   ├── src/
+│   │   ├── middleware/       # Express middleware
+│   │   │   ├── auth.ts       # Authentication middleware
+│   │   │   └── errorHandler.ts
+│   │   ├── routes/           # API routes
+│   │   │   ├── analytics.ts  # Analytics endpoints
+│   │   │   ├── auth.ts       # Authentication endpoints
+│   │   │   ├── campaigns.ts  # Campaign endpoints
+│   │   │   ├── customers.ts  # Customer endpoints
+│   │   │   ├── messages.ts   # Message endpoints
+│   │   │   ├── settings.ts   # Settings endpoints
+│   │   │   ├── tags.ts       # Tag endpoints
+│   │   │   ├── templates.ts  # Template endpoints
+│   │   │   └── webhooks.ts   # Webhook endpoints
+│   │   ├── services/         # Business logic
+│   │   │   ├── database.ts   # Prisma client
+│   │   │   ├── encryption.ts # Encryption service
+│   │   │   ├── socket.ts     # Socket.io service
+│   │   │   └── whatsapp.ts   # WhatsApp API service
+│   │   ├── validation/       # Input validation schemas
+│   │   │   ├── auth.ts
+│   │   │   └── common.ts
+│   │   └── server.ts         # Express server entry point
+│   ├── prisma/
+│   │   └── schema.prisma     # Prisma schema
+│   ├── .env                  # Environment variables
+│   ├── .env.example          # Environment variables template
+│   ├── tsconfig.json         # TypeScript configuration
+│   └── package.json          # Dependencies
+│
+├── docker/                   # Docker configuration
+├── docker-compose.yml        # Docker Compose configuration
+├── package.json              # Root package.json
+└── README.md                 # This file
 ```
 
-## 📊 Database Schema
-
-### Core Tables
-
-#### Users
-```sql
-- id (String, Primary Key)
-- email (String, Unique)
-- password (String, Hashed)
-- firstName (String)
-- lastName (String)
-- createdAt (DateTime)
-- updatedAt (DateTime)
-```
-
-#### WhatsApp Credentials (Encrypted)
-```sql
-- id (String, Primary Key)
-- userId (String, Foreign Key)
-- accessToken (String, Encrypted)
-- phoneNumberId (String)
-- businessId (String)
-- webhookVerifyToken (String)
-- isActive (Boolean)
-- createdAt (DateTime)
-- updatedAt (DateTime)
-```
-
-#### Customers
-```sql
-- id (String, Primary Key)
-- userId (String, Foreign Key)
-- name (String)
-- phone (String, Unique)
-- email (String, Optional)
-- notes (String, Optional)
-- createdAt (DateTime)
-- updatedAt (DateTime)
-```
-
-#### Tags
-```sql
-- id (String, Primary Key)
-- userId (String, Foreign Key)
-- name (String)
-- color (String, Default: #3B82F6)
-- description (String, Optional)
-- createdAt (DateTime)
-- updatedAt (DateTime)
-```
-
-#### Templates
-```sql
-- id (String, Primary Key)
-- userId (String, Foreign Key)
-- name (String)
-- category (String: marketing, utility, authentication)
-- language (String, Default: en_US)
-- content (String)
-- variables (JSON, Optional)
-- whatsappTemplateId (String, Optional)
-- status (String, Default: pending)
-- createdAt (DateTime)
-- updatedAt (DateTime)
-```
-
-#### Campaigns
-```sql
-- id (String, Primary Key)
-- userId (String, Foreign Key)
-- name (String)
-- description (String, Optional)
-- templateId (String, Foreign Key)
-- status (String: draft, sending, completed, failed)
-- totalMessages (Integer)
-- sentMessages (Integer)
-- deliveredMessages (Integer)
-- failedMessages (Integer)
-- scheduledAt (DateTime, Optional)
-- startedAt (DateTime, Optional)
-- completedAt (DateTime, Optional)
-- createdAt (DateTime)
-- updatedAt (DateTime)
-```
-
-#### Messages
-```sql
-- id (String, Primary Key)
-- conversationId (String, Foreign Key)
-- customerId (String, Foreign Key)
-- templateId (String, Foreign Key, Optional)
-- content (String)
-- messageType (String: text, template, image, document)
-- direction (String: inbound, outbound)
-- whatsappMessageId (String, Optional)
-- status (String: sent, delivered, read, failed)
-- sentAt (DateTime)
-- deliveredAt (DateTime, Optional)
-- readAt (DateTime, Optional)
-- failedAt (DateTime, Optional)
-- error (String, Optional)
-- metadata (JSON, Optional)
-- createdAt (DateTime)
-- updatedAt (DateTime)
-```
-
-## 🔧 Environment Variables
-
-### Backend (.env)
-```bash
-# Database
-DATABASE_URL="postgresql://username:password@localhost:5432/reachly_db"
-
-# JWT Secret (generate a secure random string)
-JWT_SECRET="your-super-secret-jwt-key-here"
-
-# Encryption Key for WhatsApp credentials (generate a secure random string)
-ENCRYPTION_KEY="your-32-character-encryption-key-here"
-
-# WhatsApp Webhook Verification Token
-WEBHOOK_VERIFY_TOKEN="your-webhook-verify-token-here"
-
-# Server Configuration
-PORT=5000
-NODE_ENV=development
-FRONTEND_URL="http://localhost:3000"
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-
-# WhatsApp API Configuration
-WHATSAPP_API_VERSION="v17.0"
-WHATSAPP_BASE_URL="https://graph.facebook.com"
-```
-
-### Frontend (.env.local)
-```bash
-NEXT_PUBLIC_API_URL="http://localhost:5000"
-NEXT_PUBLIC_WS_URL="http://localhost:5000"
-```
-
-## 🚀 Getting Started
+## 🚦 Quick Start
 
 ### Prerequisites
-- Node.js 18+ 
-- PostgreSQL 14+
-- npm or yarn
 
-### 1. Clone the Repository
-```bash
-git clone <repository-url>
-cd reachly
-```
+- Node.js 18+ installed
+- Docker and Docker Compose installed
+- Git installed
 
-### 2. Install Dependencies
-```bash
-# Install root dependencies
-npm install
+### Installation Steps
 
-# Install frontend dependencies
-cd frontend
-npm install
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd reachly
+   ```
 
-# Install backend dependencies
-cd ../backend
-npm install
-```
+2. **Start PostgreSQL with Docker**
+   ```bash
+   docker-compose up -d
+   ```
+   This will start PostgreSQL on port 5432.
 
-### 3. Database Setup
+3. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-#### Local PostgreSQL
-```bash
-# Create database
-createdb reachly_db
+4. **Set up environment variables**
+   
+   The following environment files are already configured:
+   - `frontend/.env` - Frontend environment variables
+   - `backend/.env` - Backend environment variables
+   
+   For production, update these files with your actual values:
+   
+   **Backend (.env)**:
+   ```env
+   DATABASE_URL="postgresql://reachly:reachly_password_123@localhost:5432/reachly_db"
+   JWT_SECRET="your-super-secret-jwt-key-here"
+   ENCRYPTION_KEY="your-32-character-encryption-key-here"
+   WEBHOOK_VERIFY_TOKEN="your-webhook-verify-token-here"
+   PORT=5000
+   NODE_ENV=development
+   FRONTEND_URL="http://localhost:3000"
+   ```
+   
+   **Frontend (.env)**:
+   ```env
+   NEXT_PUBLIC_API_URL=http://localhost:5000
+   NEXT_PUBLIC_WS_URL=http://localhost:5000
+   NEXT_PUBLIC_APP_NAME=Reachly
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   ```
 
-# Run migrations
-cd backend
-npx prisma migrate dev
+5. **Run database migrations**
+   ```bash
+   cd backend
+   npx prisma migrate dev --name init
+   npx prisma generate
+   cd ..
+   ```
 
-# Generate Prisma client
-npx prisma generate
+6. **Start the development servers**
+   ```bash
+   npm run dev
+   ```
+   
+   This will start:
+   - Frontend: http://localhost:3000
+   - Backend: http://localhost:5000
+   - Database: localhost:5432
 
-# (Optional) Open Prisma Studio
-npx prisma studio
-```
+### Verify Setup
 
-#### Managed Database (Recommended)
-1. Create a database on Supabase, Neon, or RDS
-2. Update `DATABASE_URL` in backend `.env`
-3. Run migrations:
-```bash
-cd backend
-npx prisma migrate deploy
-```
+1. Open http://localhost:3000 in your browser
+2. You should see the Reachly landing page
+3. Navigate to http://localhost:5000/health to verify the backend is running
 
-### 4. Environment Configuration
+## 📚 Available Scripts
 
-#### Backend Setup
-```bash
-cd backend
-cp .env.example .env
-# Edit .env with your configuration
-```
+### Root Scripts
+- `npm run dev` - Start both frontend and backend in development mode
+- `npm run dev:frontend` - Start frontend only
+- `npm run dev:backend` - Start backend only
+- `npm run build` - Build both frontend and backend
+- `npm run install:all` - Install all dependencies
 
-#### Frontend Setup
-```bash
-cd frontend
-cp .env.example .env.local
-# Edit .env.local with your configuration
-```
+### Backend Scripts
+- `npm run dev` - Start backend in development mode
+- `npm run build` - Build backend for production
+- `npm run start` - Start backend in production
+- `npm run prisma:generate` - Generate Prisma client
+- `npm run prisma:migrate` - Run database migrations
+- `npm run prisma:studio` - Open Prisma Studio
 
-### 5. Run Development Servers
+### Frontend Scripts
+- `npm run dev` - Start frontend in development mode
+- `npm run build` - Build frontend for production
+- `npm run start` - Start frontend in production
+- `npm run lint` - Run ESLint
+- `npm run type-check` - Run TypeScript type checking
 
-#### Option 1: Run Both Simultaneously
-```bash
-# From root directory
-npm run dev
-```
+## 🗄 Database Schema
 
-#### Option 2: Run Separately
-```bash
-# Terminal 1 - Backend
-cd backend
-npm run dev
+### Tables
 
-# Terminal 2 - Frontend
-cd frontend
-npm run dev
-```
+**Users**
+- User authentication and profile management
+- Relationships with all user-specific data
 
-### 6. Access the Application
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5000
-- Backend Health: http://localhost:5000/health
+**Customers**
+- Customer contact information and profiles
+- Tag associations and message history
 
-## 📱 Pages & Features
+**Tags**
+- Customer segmentation tags
+- Color-coded organization
 
-### Landing Page (`/`)
-- Marketing website with feature highlights
-- Pricing plans
-- Customer testimonials
-- Call-to-action for sign up
+**Templates**
+- Message templates with variable support
+- WhatsApp API synchronization
 
-### Authentication
-- **Login** (`/auth/login`) - User authentication
-- **Sign Up** (`/auth/signup`) - New user registration
+**Campaigns**
+- Bulk messaging campaigns
+- Status tracking and analytics
 
-### Dashboard
-- **Home** (`/dashboard`) - Overview and quick stats
-- **Analytics** (`/dashboard/analytics`) - Detailed analytics dashboard
+**Messages**
+- Individual message records
+- Delivery status tracking
 
-### Customer Management
-- **Customers** (`/dashboard/customers`) - Customer list and management
-- **Add Customer** (`/dashboard/customers/new`) - Create new customer
-- **Edit Customer** (`/dashboard/customers/[id]`) - Edit customer details
-
-### Communication
-- **Templates** (`/dashboard/templates`) - Message template management
-- **Campaigns** (`/dashboard/campaigns`) - Bulk messaging campaigns
-- **Inbox** (`/dashboard/inbox`) - Real-time chat interface
-
-### Organization
-- **Tags** (`/dashboard/tags`) - Tag management
-- **Settings** (`/dashboard/settings`) - App and WhatsApp settings
+**Conversations**
+- Chat conversation threads
+- Real-time message synchronization
 
 ## 🔌 API Endpoints
 
 ### Authentication
-```
-POST /auth/register     - Register new user
-POST /auth/login        - User login
-GET  /auth/profile      - Get user profile
-PUT  /auth/profile      - Update user profile
-```
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - Login user
+- `GET /auth/profile` - Get user profile
+- `PUT /auth/profile` - Update user profile
 
 ### Customers
-```
-GET    /customers              - Get all customers
-POST   /customers              - Create customer
-GET    /customers/:id          - Get customer by ID
-PUT    /customers/:id          - Update customer
-DELETE /customers/:id          - Delete customer
-```
+- `GET /customers` - Get all customers (paginated)
+- `GET /customers/:id` - Get customer by ID
+- `POST /customers` - Create new customer
+- `PUT /customers/:id` - Update customer
+- `DELETE /customers/:id` - Delete customer
 
 ### Tags
-```
-GET  /tags               - Get all tags
-POST /tags               - Create tag
-PUT  /tags/:id           - Update tag
-DELETE /tags/:id         - Delete tag
-GET  /tags/:id/customers - Get customers by tag
-```
+- `GET /tags` - Get all tags
+- `POST /tags` - Create new tag
+- `PUT /tags/:id` - Update tag
+- `DELETE /tags/:id` - Delete tag
+- `GET /tags/:id/customers` - Get customers by tag
 
 ### Templates
-```
-GET  /templates              - Get all templates
-POST /templates              - Create template
-GET  /templates/:id          - Get template by ID
-PUT  /templates/:id          - Update template
-DELETE /templates/:id        - Delete template
-POST /templates/:id/sync     - Sync with WhatsApp
-POST /templates/:id/preview  - Preview template with variables
-```
+- `GET /templates` - Get all templates
+- `GET /templates/:id` - Get template by ID
+- `POST /templates` - Create template
+- `PUT /templates/:id` - Update template
+- `DELETE /templates/:id` - Delete template
+- `POST /templates/:id/sync` - Sync with WhatsApp API
+- `POST /templates/:id/preview` - Preview template with variables
 
 ### Campaigns
-```
-GET  /campaigns                  - Get all campaigns
-POST /campaigns                  - Create campaign
-POST /campaigns/:id/send         - Send campaign
-PUT  /campaigns/:id/cancel       - Cancel campaign
-GET  /campaigns/:id/analytics    - Get campaign analytics
-```
+- `GET /campaigns` - Get all campaigns
+- `GET /campaigns/:id` - Get campaign by ID
+- `POST /campaigns` - Create campaign
+- `POST /campaigns/:id/send` - Send campaign
+- `PUT /campaigns/:id/cancel` - Cancel campaign
+- `GET /campaigns/:id/analytics` - Get campaign analytics
 
 ### Messages
-```
-GET  /messages/conversations              - Get all conversations
-GET  /messages/conversations/:id/messages  - Get conversation messages
-POST /messages/send                        - Send message
-PUT  /messages/:id/read                   - Mark message as read
-PUT  /messages/conversations/:id/archive - Archive conversation
-GET  /messages/unread-count               - Get unread count
-```
+- `GET /messages/conversations` - Get all conversations
+- `GET /messages/conversations/:id/messages` - Get conversation messages
+- `POST /messages/send` - Send message
+- `PUT /messages/:id/read` - Mark message as read
+- `GET /messages/unread-count` - Get unread message count
 
 ### Settings
-```
-GET  /settings/whatsapp      - Get WhatsApp credentials
-POST /settings/whatsapp      - Update WhatsApp credentials
-DELETE /settings/whatsapp    - Delete WhatsApp credentials
-POST /settings/whatsapp/test - Test WhatsApp connection
-GET  /settings/profile       - Get user profile
-PUT  /settings/profile      - Update user profile
-```
+- `GET /settings/whatsapp` - Get WhatsApp credentials
+- `POST /settings/whatsapp` - Update WhatsApp credentials
+- `DELETE /settings/whatsapp` - Delete WhatsApp credentials
+- `POST /settings/whatsapp/test` - Test WhatsApp connection
+- `GET /settings/profile` - Get user profile with stats
+- `PUT /settings/profile` - Update user profile
+- `PUT /settings/password` - Change password
 
 ### Analytics
-```
-GET /analytics/overview      - Dashboard overview
-GET /analytics/messages      - Message analytics
-GET /analytics/campaigns     - Campaign analytics
-GET /analytics/customers     - Customer analytics
-GET /analytics/templates     - Template analytics
-GET /analytics/conversations - Conversation analytics
-```
-
-### Webhooks
-```
-GET  /webhooks/whatsapp      - WhatsApp webhook verification
-POST /webhooks/whatsapp      - WhatsApp webhook handler
-```
+- `GET /analytics/overview` - Get dashboard overview
+- `GET /analytics/messages` - Get message analytics
+- `GET /analytics/campaigns` - Get campaign analytics
+- `GET /analytics/customers` - Get customer analytics
+- `GET /analytics/templates` - Get template analytics
+- `GET /analytics/conversations` - Get conversation analytics
 
 ## 🔐 Security Features
 
-### WhatsApp Credentials Protection
-- **AES Encryption**: All WhatsApp access tokens are encrypted before database storage
-- **Server-side Only**: Encrypted credentials never exposed to frontend
-- **Secure Storage**: Database-level encryption for sensitive data
+- **JWT Authentication** - Secure token-based authentication
+- **Password Hashing** - bcryptjs for secure password storage
+- **Data Encryption** - Encrypted WhatsApp credentials
+- **Rate Limiting** - API rate limiting to prevent abuse
+- **CORS Protection** - Configured CORS policies
+- **Helmet.js** - Security headers for Express
+- **Input Validation** - Zod schema validation
 
-### Authentication & Authorization
-- **JWT Tokens**: Secure token-based authentication
-- **Password Hashing**: bcrypt with salt rounds for password security
-- **Session Management**: Secure HTTP-only cookies
-- **Multi-tenant Isolation**: Users can only access their own data
+## 🎨 UI Components
 
-### API Security
-- **Rate Limiting**: Prevent abuse with request limits
-- **Input Validation**: Zod schemas for all API inputs
-- **CORS Configuration**: Controlled cross-origin requests
-- **Helmet.js**: Security headers and protection
-- **SQL Injection Prevention**: Prisma ORM with parameterized queries
+The project uses Radix UI primitives styled with Tailwind CSS:
 
-## 📈 Performance & Scalability
+- Button
+- Card
+- Input
+- Label
+- Badge
+- Avatar
+- Select
+- Table
+- Tabs
+- Progress
+- ScrollArea
+- Switch
+- Textarea
+- Separator
 
-### Backend Optimizations
-- **Database Indexing**: Optimized queries with proper indexes
-- **Connection Pooling**: Efficient database connections
-- **Caching**: Redis support for session and data caching
-- **Compression**: Gzip compression for API responses
-- **Rate Limiting**: Prevent API abuse
+## 📡 Real-time Features
 
-### Frontend Optimizations
-- **Code Splitting**: Next.js automatic code splitting
-- **Image Optimization**: Next.js image optimization
-- **Bundle Analysis**: Webpack bundle analyzer
-- **Progressive Loading**: Skeleton screens and loading states
-- **Responsive Design**: Mobile-first responsive design
+Socket.io is used for real-time communication:
 
-## 🚀 Deployment
-
-### Frontend Deployment (Vercel)
-
-#### 1. Prepare for Deployment
-```bash
-cd frontend
-npm run build
-```
-
-#### 2. Deploy to Vercel
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-
-# Set environment variables in Vercel dashboard
-```
-
-#### 3. Environment Variables (Vercel)
-```
-NEXT_PUBLIC_API_URL=https://your-backend-url.com
-NEXT_PUBLIC_WS_URL=https://your-backend-url.com
-```
-
-### Backend Deployment (Render)
-
-#### 1. Prepare for Deployment
-```bash
-cd backend
-npm run build
-```
-
-#### 2. Deploy to Render
-1. Create account on Render.com
-2. Connect your GitHub repository
-3. Create new Web Service
-4. Configure build settings:
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-5. Add environment variables in Render dashboard
-
-#### 3. Environment Variables (Render)
-```bash
-DATABASE_URL=your-production-database-url
-JWT_SECRET=your-production-jwt-secret
-ENCRYPTION_KEY=your-production-encryption-key
-WEBHOOK_VERIFY_TOKEN=your-webhook-token
-NODE_ENV=production
-PORT=5000
-FRONTEND_URL=https://your-frontend-url.vercel.app
-```
-
-### Database Deployment
-
-#### Option 1: Supabase (Recommended)
-1. Create account on Supabase
-2. Create new project
-3. Get connection string
-4. Run migrations:
-```bash
-cd backend
-npx prisma migrate deploy
-```
-
-#### Option 2: Neon
-1. Create account on Neon.tech
-2. Create new database
-3. Get connection string
-4. Run migrations
-
-#### Option 3: AWS RDS
-1. Create RDS PostgreSQL instance
-2. Configure security groups
-3. Get connection details
-4. Run migrations
-
-## 🔧 WhatsApp API Setup
-
-### 1. Create Facebook App
-1. Go to [Facebook Developers](https://developers.facebook.com/)
-2. Create new app
-3. Add WhatsApp Business API product
-4. Get temporary access token
-
-### 2. Configure Webhook
-1. In your Facebook app, go to WhatsApp API Setup
-2. Add webhook URL: `https://your-backend-domain.com/webhooks/whatsapp`
-3. Set verify token (same as in your environment)
-4. Subscribe to events:
-   - messages
-   - message_deliveries
-   - message_reads
-   - message_failures
-
-### 3. Get Permanent Credentials
-1. Complete Facebook business verification
-2. Get permanent access token
-3. Get phone number ID and business ID
-4. Update credentials in Reachly settings
-
-### 4. Template Approval Process
-1. Create templates in Reachly
-2. Sync with WhatsApp API
-3. Templates go to "Pending" status
-4. Facebook reviews and approves templates
-5. Approved templates can be used in campaigns
+- New message notifications
+- Message status updates
+- Conversation updates
+- Campaign progress updates
+- Typing indicators
 
 ## 🧪 Testing
 
-### Backend Testing
+To run tests (when implemented):
+
 ```bash
+# Backend tests
 cd backend
 npm test
-```
 
-### Frontend Testing
-```bash
+# Frontend tests
 cd frontend
 npm test
 ```
 
-### End-to-End Testing
-```bash
-# Install Playwright
-npm install -g @playwright/test
+## 🐛 Troubleshooting
 
-# Run E2E tests
-npx playwright test
+### Database Connection Issues
+
+If you can't connect to the database:
+
+1. Verify Docker is running: `docker ps`
+2. Check PostgreSQL logs: `docker logs reachly-postgres`
+3. Verify DATABASE_URL in backend/.env
+
+### Port Already in Use
+
+If ports 3000 or 5000 are already in use:
+
+1. Find the process using the port:
+   ```bash
+   lsof -i :3000  # or 5000
+   ```
+
+2. Kill the process or change the port in .env files
+
+### Prisma Issues
+
+If you encounter Prisma errors:
+
+```bash
+cd backend
+npx prisma generate
+npx prisma migrate dev
 ```
 
-## 📝 Development Guidelines
+### Build Errors
+
+If you encounter TypeScript or build errors:
+
+```bash
+# Clean and reinstall
+rm -rf node_modules
+rm -rf .next
+rm -rf dist
+npm install
+npm run build
+```
+
+## 📝 Development Notes
 
 ### Code Style
-- **ESLint**: Code linting and formatting
-- **Prettier**: Code formatting
-- **TypeScript**: Strict type checking
-- **Husky**: Pre-commit hooks
 
-### Git Workflow
-1. Create feature branch from `main`
-2. Make changes with proper commits
-3. Create pull request with description
-4. Code review and approval
-5. Merge to `main`
+- TypeScript for type safety
+- ESLint for code linting
+- Prettier for code formatting
+- Conventional commits for git messages
 
-### Commit Messages
-```
-feat: add new customer import feature
-fix: resolve authentication token expiry issue
-docs: update API documentation for campaigns
-style: improve dashboard layout responsiveness
-refactor: optimize database queries for customers
-test: add unit tests for message service
+### Environment Variables
+
+Never commit `.env` files. Use `.env.example` as a template for required variables.
+
+### Database Migrations
+
+Always create migrations for schema changes:
+
+```bash
+cd backend
+npx prisma migrate dev --name describe_your_change
 ```
 
-## 🔮 Future Improvements
+### API Documentation
 
-### Short-term
-- [ ] File attachment support in chat
-- [ ] Message scheduling
-- [ ] Customer segmentation based on behavior
-- [ ] Advanced analytics with custom reports
-- [ ] Mobile app (React Native)
+API endpoints are self-documenting through TypeScript types. Refer to the type definitions in the validation folder.
 
-### Long-term
-- [ ] Multi-language support
-- [ ] Advanced automation workflows
-- [ ] Integration with other platforms (Shopify, Salesforce)
-- [ ] AI-powered message suggestions
-- [ ] White-label solution
-- [ ] Advanced user roles and permissions
+## 🚀 Deployment
 
-## 📄 License
+### Production Build
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+# Build frontend
+cd frontend
+npm run build
+
+# Build backend
+cd backend
+npm run build
+```
+
+### Environment Setup
+
+Update `.env` files with production values:
+
+- Use strong JWT_SECRET and ENCRYPTION_KEY
+- Set NODE_ENV=production
+- Update DATABASE_URL with production database
+- Configure proper CORS origins
+- Set up SSL/HTTPS
+
+### Running in Production
+
+```bash
+# Backend
+cd backend
+npm run start
+
+# Frontend
+cd frontend
+npm run start
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Commit with clear messages
+5. Push to your branch
+6. Open a Pull Request
 
-## 📞 Support
+## 📄 License
 
-- **Email**: support@reachly.com
-- **Documentation**: [docs.reachly.com](https://docs.reachly.com)
-- **Discord**: [Join our community](https://discord.gg/reachly)
+This project is licensed under the MIT License.
 
-## 🙏 Acknowledgments
+## 🆘 Support
 
-- [Next.js](https://nextjs.org/) for the amazing React framework
-- [shadcn/ui](https://ui.shadcn.com/) for beautiful components
-- [Tailwind CSS](https://tailwindcss.com/) for styling
-- [Prisma](https://prisma.io/) for database ORM
-- [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp) for messaging platform
+For issues, questions, or contributions, please open an issue on GitHub.
+
+## 🌟 Features Coming Soon
+
+- [ ] Multi-language support
+- [ ] Advanced analytics with export
+- [ ] A/B testing for campaigns
+- [ ] Integration with other platforms (CRM, Email)
+- [ ] Mobile app
+- [ ] Advanced automation workflows
+- [ ] WhatsApp Business Account management
+- [ ] Media file management
+- [ ] Team collaboration features
 
 ---
 
-**Built with ❤️ by the Reachly team**
+Built with ❤️ using Next.js, Express, and PostgreSQL
