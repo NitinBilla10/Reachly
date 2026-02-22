@@ -101,6 +101,49 @@ export class SocketService {
       ...update
     });
   }
+
+  // Upload progress events
+  emitUploadProgress(userId: string, data: {
+    type: string;
+    progressId: string;
+    filename: string;
+    percentage: number;
+    processed: number;
+    total: number;
+    message?: string;
+  }) {
+    this.io.to(`user:${userId}`).emit('upload_progress', data);
+  }
+
+  emitUploadStarted(userId: string, progressId: string, filename: string) {
+    this.emitUploadProgress(userId, {
+      type: 'upload_started',
+      progressId,
+      filename,
+      percentage: 0
+    });
+  }
+
+  emitUploadCompleted(userId: string, progressId: string, filename: string, total: number) {
+    this.emitUploadProgress(userId, {
+      type: 'upload_completed',
+      progressId,
+      filename,
+      percentage: 100,
+      processed: total,
+      total
+    });
+  }
+
+  emitUploadFailed(userId: string, progressId: string, filename: string, error: string) {
+    this.emitUploadProgress(userId, {
+      type: 'upload_failed',
+      progressId,
+      filename,
+      error,
+      percentage: 0
+    });
+  }
 }
 
 let socketService: SocketService;

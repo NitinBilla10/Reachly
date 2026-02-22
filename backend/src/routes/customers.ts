@@ -4,6 +4,15 @@ import { createError } from '../middleware/errorHandler';
 import { createCustomerSchema, updateCustomerSchema } from '../validation/common';
 import { AuthRequest } from '../middleware/auth';
 import { getSocketService } from '../services/socket';
+import {
+  trackUploadProgress,
+  MulterRequest,
+  getUploadProgress,
+  processCSVImport,
+  exportCustomersToCSV,
+  validateCSVStructure
+} from '../middleware/upload';
+import { Readable } from 'stream';
 
 const router = Router();
 
@@ -273,6 +282,133 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Bulk import customers from CSV
+router.post('/import', trackUploadProgress, async (req: MulterRequest, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded'
+      });
+    }
+
+    // Read CSV file content
+    const csvContent = req.file.buffer.toString('utf-8');
+
+    // Validate CSV structure
+    const validationResult = validateCSVStructure(csvContent);
+    if (!validationResult.isValid) {
+      throw new Error(validationResult.headers.join(', '));
+    }
+
+    // Parse headers to get column mapping
+    const headers = validationResult.headers;
+    const columnMapping = {
+      name: headers.indexOf('name'),
+      phone: headers.indexOf('phone'),
+      email: headers.indexOf('email'),
+      company: headers.indexOf('company'),
+      gender: headers.indexOf('gender'),
+      source: headers.indexOf('source'),
+    };
+
+    // Get existing emails and phones to avoid duplicates
+    const existingContacts = await prisma.customer.findMany({
+      where: {
+        userId,
+      OR: [
+        { email: { not: null } },
+        { phone: { not: null } }
+      ]
+    },
+      select: {
+    id: true,
+    email: true,
+    phone: true
+  }
+});
+
+const existingEmails = new Set(existingContacts.map(c => c.email));
+const existingPhones = new Set(existingContacts.map(c => c.phone));
+
+// Process import in background
+const progressId = `${userId}-${Date.now()}`;
+processCSVImport(userId, csvContent, headers, columnMapping, progressId, existingEmails, existingPhones);
+
+res.json({
+  success: true,
+  message: 'CSV file uploaded successfully. Import is being processed in the background.',
+  data: {
+    progressId,
+    totalCustomers: validationResult.totalRows - 1,
+    message: 'You can track the import progress in real-time. Check your notifications for updates.'
+  }
+});
+  } catch (error: any) {
+    const socketService = getSocketService();
+    if (socketService && req.file) {
+      socketService.getSocketService().emitUploadProgress(userId, {
+    type: 'import_failed',
+    filename: req.file.originalname,
+    error: error.message
+  });
+}
+
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Failed to import customers'
+    });
+  }
+});
+
+// Get import progress
+router.get('/import/progress/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userProgress = getUploadProgress(req.user!.id, id);
+
+    if (!userProgress.length) {
+      return res.json({
+        success: true,
+        data: { progress: [] }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { progress: userProgress }
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Export customers to CSV
+router.get('/export', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const customerIds = req.query.ids ? (req.query.ids as string).split(',') : undefined;
+
+    const result = await exportCustomersToCSV(userId, customerIds || []);
+
+    // Set proper content type for CSV download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+
+    res.send(result.csv);
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Failed to export customers to CSV'
+    });
+  }
+});
+
 // Delete customer
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -294,10 +430,58 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       where: { id }
     });
 
+    // Emit real-time update
+    const socketService = getSocketService();
+    if (socketService) {
+      socketService.getSocketService().emitConversationUpdate(req.user!.id, id, {
+        type: 'customer_deleted'
+      });
+    }
+
     res.json({
       success: true,
       message: 'Customer deleted successfully'
     });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Bulk delete customers
+router.delete('/bulk', async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      throw createError('Customer IDs are required', 400);
+    }
+
+    const deletedCount = await prisma.customer.deleteMany({
+      where: {
+    id: { in: ids },
+    userId: req.user!.id
+  }
+});
+
+// Emit real-time update
+const socketService = getSocketService();
+if (socketService) {
+  socketService.getSocketService().emitConversationUpdate(req.user!.id, 'bulk_delete', {
+    type: 'customers_deleted',
+    count: deletedCount.count
+  });
+}
+
+res.json({
+  success: true,
+  message: `${deletedCount.count} customers deleted successfully`,
+  data: {
+    deletedCount: deletedCount.count
+  }
+});
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
       success: false,

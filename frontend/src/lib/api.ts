@@ -109,6 +109,42 @@ export const customersAPI = {
   }) => api.put(`/customers/${id}`, data),
 
   delete: (id: string) => api.delete(`/customers/${id}`),
+
+  // Import/Export
+  importCSV: (file: File, onUploadProgress?: (progress: any) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    return api.post('/customers/import', formData, {
+      onUploadProgress: (progressEvent) => {
+        if (onUploadProgress) {
+          onUploadProgress(progressEvent.detail)
+        }
+      }
+    })
+  },
+
+  getImportProgress: (progressId: string) => api.get(`/customers/import/progress/${progressId}`),
+
+  exportCSV: (params?: {
+    ids?: string[]
+    hasOptIn?: boolean
+    hasOptOut?: boolean
+    dateRange?: '30d' | '90d' | 'all'
+  }) => api.get('/customers/export', { params }),
+
+  downloadCSV: (csv: string, filename: string) => {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  },
+
+  bulkDelete: (ids: string[]) => api.delete('/customers/bulk'),
 }
 
 export const contactTypesAPI = {
