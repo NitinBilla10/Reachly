@@ -11,6 +11,7 @@ import dotenv from 'dotenv';
 // Import routes
 import authRoutes from './routes/auth';
 import customerRoutes from './routes/customers';
+import contactTypeRoutes from './routes/contactTypes';
 import tagRoutes from './routes/tags';
 import templateRoutes from './routes/templates';
 import campaignRoutes from './routes/campaigns';
@@ -64,6 +65,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/auth', authRoutes);
 app.use('/customers', authenticateToken, customerRoutes);
+app.use('/contact-types', authenticateToken, contactTypeRoutes);
 app.use('/tags', authenticateToken, tagRoutes);
 app.use('/templates', authenticateToken, templateRoutes);
 app.use('/campaigns', authenticateToken, campaignRoutes);

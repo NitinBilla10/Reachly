@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Customers', href: '/dashboard/customers', icon: Users },
+  { name: 'Contact Types', href: '/dashboard/contact-types', icon: User },
   { name: 'Tags', href: '/dashboard/tags', icon: Tags },
   { name: 'Templates', href: '/dashboard/templates', icon: MessageSquareText },
   { name: 'Bulk Messaging', href: '/dashboard/campaigns', icon: Send },

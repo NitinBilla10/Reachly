@@ -73,6 +73,9 @@ export const customersAPI = {
     limit?: number
     search?: string
     tagIds?: string[]
+    typeId?: string
+    source?: string
+    optIn?: boolean
   }) => api.get('/customers', { params }),
 
   getById: (id: string) => api.get(`/customers/${id}`),
@@ -83,6 +86,12 @@ export const customersAPI = {
     email?: string
     notes?: string
     tags?: string[]
+    gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say'
+    company?: string
+    source?: string
+    optIn?: boolean
+    image?: string
+    typeId?: string
   }) => api.post('/customers', data),
 
   update: (id: string, data: {
@@ -91,9 +100,35 @@ export const customersAPI = {
     email?: string
     notes?: string
     tags?: string[]
+    gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say'
+    company?: string
+    source?: string
+    optIn?: boolean
+    image?: string
+    typeId?: string
   }) => api.put(`/customers/${id}`, data),
 
   delete: (id: string) => api.delete(`/customers/${id}`),
+}
+
+export const contactTypesAPI = {
+  getAll: () => api.get('/contact-types'),
+
+  getById: (id: string) => api.get(`/contact-types/${id}`),
+
+  create: (data: {
+    name: string
+    color?: string
+    description?: string
+  }) => api.post('/contact-types', data),
+
+  update: (id: string, data: {
+    name?: string
+    color?: string
+    description?: string
+  }) => api.put(`/contact-types/${id}`, data),
+
+  delete: (id: string) => api.delete(`/contact-types/${id}`),
 }
 
 export const tagsAPI = {
