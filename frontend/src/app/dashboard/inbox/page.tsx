@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Send, Search, UserCircle2, ArrowLeft, MessageSquarePlus, X } from 'lucide-react'
+import { Send, Search, UserCircle2, ArrowLeft, MessageSquarePlus, X, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -311,9 +311,18 @@ export default function InboxPage() {
                           }`}
                         >
                           <p className="whitespace-pre-wrap">{message.content}</p>
-                          <span className="mt-1 block text-[10px] opacity-70">
-                            {format(new Date(message.createdAt), 'hh:mm a')}
-                          </span>
+                          <div className={`mt-1 flex items-center gap-1 text-[10px] ${isAgent ? 'justify-end opacity-90' : 'justify-start opacity-70'}`}>
+                            <span>{format(new Date(message.createdAt), 'hh:mm a')}</span>
+                            {isAgent && (
+                              <span className="ml-0.5 inline-flex items-center">
+                                {message.status === 'sent' && <Check className="h-3 w-3 opacity-70" />}
+                                {message.status === 'delivered' && <CheckCheck className="h-3 w-3 opacity-70" />}
+                                {message.status === 'read' && <CheckCheck className="h-3 w-3 text-blue-300 drop-shadow-sm" />}
+                                {message.status === 'failed' && <AlertCircle className="h-3 w-3 text-red-300" />}
+                                {(message.status === 'pending' || !message.status) && <Clock className="h-3 w-3 opacity-70" />}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )
