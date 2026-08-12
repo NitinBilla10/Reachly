@@ -34,6 +34,7 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (activeConversationId) {
+      setMessages([]) // Clear messages when switching conversations
       fetchMessages(activeConversationId)
     }
   }, [activeConversationId])
@@ -76,8 +77,9 @@ export default function InboxPage() {
   const fetchMessages = async (id: string) => {
     try {
       const res = await messagesAPI.getConversationMessages(id, { limit: 50 })
-      if (res.data.data && Array.isArray(res.data.data)) {
-        setMessages(res.data.data.reverse()) // Reverse so oldest is top, newest is bottom
+      if (res.data.data && Array.isArray(res.data.data.messages)) {
+        // The backend already reverses it to chronological order
+        setMessages(res.data.data.messages)
       }
       // Also mark conversation as read
       // messagesAPI.markAsRead(...) could be called here if implemented for conversations
