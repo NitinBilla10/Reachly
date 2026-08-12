@@ -3,14 +3,13 @@ import multer from 'multer';
 
 // Store for tracking upload progress
 interface UploadProgress {
-  [userId: string]: {
-    filename: string;
-    total: number;
-    processed: number;
-    status: 'uploading' | 'processing' | 'completed' | 'failed';
-    error?: string;
-    createdAt: Date;
-  }
+  filename?: string;
+  total?: number;
+  processed?: number;
+  percentage?: number;
+  status: 'uploading' | 'processing' | 'completed' | 'failed';
+  error?: string;
+  createdAt?: Date;
 }
 
 const uploadProgress = new Map<string, UploadProgress>();
@@ -21,7 +20,7 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size
+    fileSize: process.env.MAX_FILE_SIZE ? parseInt(process.env.MAX_FILE_SIZE) : 5 * 1024 * 1024, // 5MB max file size
   },
   fileFilter: (req: any, file: any, cb: any) => {
     // Only accept CSV files
@@ -39,10 +38,10 @@ export interface MulterRequest extends Request {
 }
 
 // Middleware to track upload progress
-export const trackUploadProgress = (req: MulterRequest, res: Response, next: NextFunction) => {
+export const trackUploadProgress = (req: any, res: Response, next: NextFunction) => {
   const uploadHandler = upload.single('file');
 
-  uploadHandler(req, res, async (err) => {
+  uploadHandler(req, res, async (err: any) => {
     if (err) {
       return res.status(400).json({
         success: false,
@@ -87,13 +86,13 @@ export const trackUploadProgress = (req: MulterRequest, res: Response, next: Nex
     try {
       // Parse CSV file
       const csvContent = req.file.buffer.toString('utf-8');
-      const lines = csvContent.split('\n').filter(line => line.trim());
+      const lines = csvContent.split('\n').filter((line: string) => line.trim());
       
       if (lines.length === 0 || (lines.length === 1 && !lines[0].trim())) {
         throw new Error('CSV file is empty');
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const headers = lines[0].split(',').map((h: string) => h.trim().toLowerCase());
       const totalCustomers = lines.length - 1; // Exclude header row
       
       // Required columns
@@ -235,14 +234,13 @@ export const trackUploadProgress = (req: MulterRequest, res: Response, next: Nex
     }
 
     next();
-  };
+  });
 };
 
 // Get upload progress for a user
-export const getUploadProgress = (userId: string): UploadProgress[] => {
-  const userProgress: Array.from(uploadProgress.entries())
-    const [userId]: UploadProgress[] = userProgress
-    .filter(([key]) => key.startsWith(userId))
+export const getUploadProgress = (userId: string, progressId?: string): UploadProgress[] => {
+  const userProgress = Array.from(uploadProgress.entries())
+    .filter(([key]) => progressId ? key === progressId : key.startsWith(userId))
     .map(([_, progress]) => progress);
 
   return userProgress;
@@ -298,10 +296,11 @@ export const processCSVImport = async (userId: string, csvContent: string, heade
     }
 
     customers.push(customerData);
+  }
 
-    // Batch insert (100 records at a time)
-    const batchSize = 100;
-    for (let j = 0; j < customers.length; j += batchSize) {
+  // Batch insert (100 records at a time)
+  const batchSize = 100;
+  for (let j = 0; j < customers.length; j += batchSize) {
       const batch = customers.slice(j, j + batchSize);
       await prisma.customer.createMany({ data: batch });
       
@@ -332,8 +331,8 @@ export const processCSVImport = async (userId: string, csvContent: string, heade
       percentage: 100
     });
 
-    const socketService = await import('../services/socket');
-    const socketService.getSocketService().emitUploadProgress(userId, {
+    const socketServiceModule = await import('../services/socket');
+    socketServiceModule.getSocketService().emitUploadProgress(userId, {
       type: 'import_completed',
       progressId,
       filename: finalProgress.filename,
@@ -345,7 +344,7 @@ export const processCSVImport = async (userId: string, csvContent: string, heade
 };
 
 // Export customers to CSV
-export const exportCustomersToCSV = async (userId: string, customerIds: string[]): Promise<{ success: boolean; csv: string; error?: string }> => {
+export const exportCustomersToCSV = async (userId: string, customerIds: string[]): Promise<{ success: boolean; csv?: string; filename?: string; error?: string }> => {
   try {
     // Get customers
     const { prisma } = await import('../services/database');
@@ -398,8 +397,8 @@ export const exportCustomersToCSV = async (userId: string, customerIds: string[]
     // Add header row
     const csvContent = [
       headers.join(','),
-      ...csvRows
-    ].map(row => row.join(',')).join('\n');
+      ...csvRows.map((row: string[]) => row.join(','))
+    ].join('\n');
 
     return {
       success: true,

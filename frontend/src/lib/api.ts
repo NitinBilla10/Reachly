@@ -111,14 +111,14 @@ export const customersAPI = {
   delete: (id: string) => api.delete(`/customers/${id}`),
 
   // Import/Export
-  importCSV: (file: File, onUploadProgress?: (progress: any) => {
+  importCSV: (file: File, onUploadProgress?: (progress: any) => void) => {
     const formData = new FormData()
     formData.append('file', file)
     
     return api.post('/customers/import', formData, {
       onUploadProgress: (progressEvent) => {
         if (onUploadProgress) {
-          onUploadProgress(progressEvent.detail)
+          onUploadProgress(progressEvent)
         }
       }
     })
@@ -287,6 +287,7 @@ export const settingsAPI = {
     firstName?: string
     lastName?: string
     email?: string
+    company?: string
   }) => api.put('/settings/profile', data),
 
   changePassword: (data: {

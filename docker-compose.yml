@@ -10,11 +10,11 @@ services:
       POSTGRES_PASSWORD: reachly_password_123
       POSTGRES_DB: reachly_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U reachly"]
+      test: ["CMD-SHELL", "pg_isready -U reachly -d reachly_db"]
       interval: 10s
       timeout: 5s
       retries: 5

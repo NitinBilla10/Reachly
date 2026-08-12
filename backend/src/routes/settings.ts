@@ -215,6 +215,7 @@ router.get('/profile', async (req: AuthRequest, res: Response) => {
         email: true,
         firstName: true,
         lastName: true,
+        company: true,
         createdAt: true,
         updatedAt: true
       }
@@ -259,7 +260,7 @@ router.get('/profile', async (req: AuthRequest, res: Response) => {
 // Update user profile
 router.put('/profile', async (req: AuthRequest, res: Response) => {
   try {
-    const { firstName, lastName, email } = req.body;
+    const { firstName, lastName, email, company } = req.body;
 
     // Check if email is already taken by another user
     if (email) {
@@ -282,7 +283,8 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
       data: {
         ...(firstName && { firstName }),
         ...(lastName && { lastName }),
-        ...(email && { email })
+        ...(email && { email }),
+        ...(company !== undefined && { company })
       },
       select: {
         id: true,

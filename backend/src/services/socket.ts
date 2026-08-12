@@ -106,11 +106,12 @@ export class SocketService {
   emitUploadProgress(userId: string, data: {
     type: string;
     progressId: string;
-    filename: string;
-    percentage: number;
-    processed: number;
-    total: number;
+    filename?: string;
+    percentage?: number;
+    processed?: number;
+    total?: number;
     message?: string;
+    error?: string;
   }) {
     this.io.to(`user:${userId}`).emit('upload_progress', data);
   }

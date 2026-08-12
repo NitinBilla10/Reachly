@@ -78,52 +78,6 @@ const testimonials = [
   },
 ]
 
-const pricingPlans = [
-  {
-    name: 'Starter',
-    price: '$29',
-    description: 'Perfect for small businesses',
-    features: [
-      '1,000 messages/month',
-      'Up to 1,000 customers',
-      'Basic templates',
-      'Email support',
-      'Basic analytics',
-    ],
-    popular: false,
-  },
-  {
-    name: 'Professional',
-    price: '$79',
-    description: 'For growing businesses',
-    features: [
-      '10,000 messages/month',
-      'Up to 10,000 customers',
-      'Advanced templates',
-      'Priority support',
-      'Advanced analytics',
-      'Custom tags',
-      'Bulk messaging',
-    ],
-    popular: true,
-  },
-  {
-    name: 'Enterprise',
-    price: '$199',
-    description: 'For large organizations',
-    features: [
-      'Unlimited messages',
-      'Unlimited customers',
-      'White-label solution',
-      'Dedicated support',
-      'Custom integrations',
-      'Advanced security',
-      'API access',
-    ],
-    popular: false,
-  },
-]
-
 export default function HomePage() {
   const [isPlaying, setIsPlaying] = useState(false)
 
@@ -139,9 +93,6 @@ export default function HomePage() {
           <nav className="hidden md:flex items-center space-x-8">
             <Link href="#features" className="text-sm font-medium hover:text-primary">
               Features
-            </Link>
-            <Link href="#pricing" className="text-sm font-medium hover:text-primary">
-              Pricing
             </Link>
             <Link href="#testimonials" className="text-sm font-medium hover:text-primary">
               Testimonials
@@ -292,62 +243,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-20">
-        <div className="container">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              Simple, transparent pricing
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Choose the plan that fits your business needs.
-            </p>
-          </div>
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
-            {pricingPlans.map((plan, index) => (
-              <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                className={plan.popular ? 'scale-105' : ''}
-              >
-                <Card className={`h-full ${plan.popular ? 'border-primary' : ''}`}>
-                  <CardHeader>
-                    {plan.popular && (
-                      <Badge variant="default" className="mb-2 w-fit">
-                        Most Popular
-                      </Badge>
-                    )}
-                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                    <div className="flex items-baseline space-x-2">
-                      <span className="text-4xl font-bold">{plan.price}</span>
-                      <span className="text-muted-foreground">/month</span>
-                    </div>
-                    <CardDescription>{plan.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-3">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-center">
-                          <CheckCircle className="mr-3 h-4 w-4 text-primary" />
-                          <span className="text-sm">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Link href="/auth/signup" className="mt-6 block">
-                      <Button className="w-full" variant={plan.popular ? 'default' : 'outline'}>
-                        Get Started
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section */}
       <section className="py-20">
         <div className="container">
@@ -360,7 +255,7 @@ export default function HomePage() {
             </p>
             <Link href="/auth/signup">
               <Button size="lg" className="px-8">
-                Start Your Free Trial
+                Get Started Now
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -385,7 +280,6 @@ export default function HomePage() {
               <h3 className="mb-4 font-semibold">Product</h3>
               <ul className="space-y-2 text-sm">
                 <li><Link href="#features" className="text-muted-foreground hover:text-foreground">Features</Link></li>
-                <li><Link href="#pricing" className="text-muted-foreground hover:text-foreground">Pricing</Link></li>
                 <li><Link href="/docs" className="text-muted-foreground hover:text-foreground">Documentation</Link></li>
               </ul>
             </div>

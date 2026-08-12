@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../services/database';
+import { Prisma } from '@prisma/client';
 import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
 
@@ -153,14 +154,14 @@ router.get('/messages', async (req: AuthRequest, res: Response) => {
     // Get message counts over time
     const messageAnalytics = await prisma.$queryRaw`
       SELECT 
-        DATE_TRUNC('${interval}', "sentAt") as date,
+        DATE_TRUNC(${Prisma.raw(`'${interval}'`)}, "sentAt") as date,
         direction,
         COUNT(*) as count
       FROM "messages" m
       JOIN "conversations" c ON m."conversationId" = c.id
       WHERE c."userId" = ${req.user!.id}
         AND m."sentAt" >= ${startDate}
-      GROUP BY DATE_TRUNC('${interval}', "sentAt"), direction
+      GROUP BY DATE_TRUNC(${Prisma.raw(`'${interval}'`)}, "sentAt"), direction
       ORDER BY date ASC
     `;
 
@@ -511,8 +512,8 @@ router.get('/conversations', async (req: AuthRequest, res: Response) => {
     `;
 
     // Calculate average response time
-    const avgResponseTime = responseTimes.length > 0 
-      ? responseTimes.reduce((sum: number, conv: any) => sum + parseFloat(conv.response_time_minutes || 0), 0) / responseTimes.length
+    const avgResponseTime = (responseTimes as any[]).length > 0 
+      ? (responseTimes as any[]).reduce((sum: number, conv: any) => sum + parseFloat(conv.response_time_minutes || 0), 0) / (responseTimes as any[]).length
       : 0;
 
     res.json({

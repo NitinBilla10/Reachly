@@ -6,12 +6,13 @@ import {
   LayoutDashboard,
   Users,
   Tags,
-  MessageSquareText,
+  MessageSquare,
   Send,
   Inbox,
   BarChart3,
   Settings,
   Sparkles,
+  User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,7 +21,7 @@ const navigation = [
   { name: 'Customers', href: '/dashboard/customers', icon: Users },
   { name: 'Contact Types', href: '/dashboard/contact-types', icon: User },
   { name: 'Tags', href: '/dashboard/tags', icon: Tags },
-  { name: 'Templates', href: '/dashboard/templates', icon: MessageSquareText },
+  { name: 'Templates', href: '/dashboard/templates', icon: MessageSquare },
   { name: 'Bulk Messaging', href: '/dashboard/campaigns', icon: Send },
   { name: 'Shared Inbox', href: '/dashboard/inbox', icon: Inbox },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
@@ -58,20 +59,6 @@ export function Sidebar() {
           )
         })}
       </nav>
-      <div className="border-t p-4">
-        <div className="rounded-lg bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4">
-          <p className="text-sm font-semibold">Upgrade to Pro</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Unlock unlimited messages and advanced analytics.
-          </p>
-          <Link
-            href="/dashboard/settings"
-            className="mt-3 inline-flex text-xs font-medium text-primary"
-          >
-            Manage billing
-          </Link>
-        </div>
-      </div>
     </aside>
   )
 }

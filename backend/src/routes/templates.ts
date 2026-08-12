@@ -65,7 +65,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const validatedData = createTemplateSchema.parse(req.body);
 
     // Extract variables from template content (simple regex for {{variable}})
-    const variables = [];
+    const variables: string[] = [];
     const variableRegex = /{{(\w+)}}/g;
     let match;
     
@@ -79,6 +79,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       data: {
         ...validatedData,
         variables: variables,
+        status: 'approved',
         userId: req.user!.id
       }
     });
@@ -124,7 +125,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     // If updating content, re-extract variables
     let updatedData = { ...validatedData };
     if (validatedData.content) {
-      const variables = [];
+      const variables: string[] = [];
       const variableRegex = /{{(\w+)}}/g;
       let match;
       
@@ -139,7 +140,10 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
     const template = await prisma.template.update({
       where: { id },
-      data: updatedData
+      data: {
+        ...updatedData,
+        status: 'approved'
+      }
     });
 
     res.json({

@@ -283,7 +283,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Bulk import customers from CSV
-router.post('/import', trackUploadProgress, async (req: MulterRequest, res: Response) => {
+router.post('/import', trackUploadProgress, async (req: any, res: Response) => {
   try {
     const userId = (req as any).user?.id;
 
@@ -314,28 +314,9 @@ router.post('/import', trackUploadProgress, async (req: MulterRequest, res: Resp
       source: headers.indexOf('source'),
     };
 
-    // Get existing emails and phones to avoid duplicates
-    const existingContacts = await prisma.customer.findMany({
-      where: {
-        userId,
-      OR: [
-        { email: { not: null } },
-        { phone: { not: null } }
-      ]
-    },
-      select: {
-    id: true,
-    email: true,
-    phone: true
-  }
-});
-
-const existingEmails = new Set(existingContacts.map(c => c.email));
-const existingPhones = new Set(existingContacts.map(c => c.phone));
-
-// Process import in background
-const progressId = `${userId}-${Date.now()}`;
-processCSVImport(userId, csvContent, headers, columnMapping, progressId, existingEmails, existingPhones);
+    // Process import in background
+    const progressId = `${req.user!.id}-${Date.now()}`;
+    processCSVImport(req.user!.id, csvContent, headers, progressId);
 
 res.json({
   success: true,
@@ -349,12 +330,13 @@ res.json({
   } catch (error: any) {
     const socketService = getSocketService();
     if (socketService && req.file) {
-      socketService.getSocketService().emitUploadProgress(userId, {
-    type: 'import_failed',
-    filename: req.file.originalname,
-    error: error.message
-  });
-}
+      socketService.emitUploadProgress(req.user!.id, {
+        type: 'import_failed',
+        progressId: `${req.user!.id}-failed`,
+        filename: req.file.originalname,
+        error: error.message
+      });
+    }
 
     res.status(error.statusCode || 500).json({
       success: false,
@@ -433,7 +415,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     // Emit real-time update
     const socketService = getSocketService();
     if (socketService) {
-      socketService.getSocketService().emitConversationUpdate(req.user!.id, id, {
+      socketService.emitConversationUpdate(req.user!.id, id, {
         type: 'customer_deleted'
       });
     }
@@ -469,7 +451,7 @@ router.delete('/bulk', async (req: AuthRequest, res: Response) => {
 // Emit real-time update
 const socketService = getSocketService();
 if (socketService) {
-  socketService.getSocketService().emitConversationUpdate(req.user!.id, 'bulk_delete', {
+  socketService.emitConversationUpdate(req.user!.id, 'bulk_delete', {
     type: 'customers_deleted',
     count: deletedCount.count
   });

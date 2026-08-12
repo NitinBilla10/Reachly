@@ -27,17 +27,19 @@ export const metadata: Metadata = {
     description: 'Manage WhatsApp Business API messages, customers, and campaigns with ease',
     creator: '@reachly',
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-  },
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon-16x16.png',
     apple: '/apple-touch-icon.png',
   },
-  manifest: '/site.webmanifest',
+  manifest: '/manifest.json',
+}
+
+export const viewport = {
+  themeColor: '#0f172a',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({

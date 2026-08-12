@@ -32,7 +32,7 @@ export interface WhatsAppCredentials {
 }
 
 export class WhatsAppService {
-  private baseURL = 'https://graph.facebook.com/v17.0';
+  private baseURL = `${process.env.WHATSAPP_BASE_URL || 'https://graph.facebook.com'}/${process.env.WHATSAPP_API_VERSION || 'v26.0'}`;
 
   async getCredentials(userId: string): Promise<WhatsAppCredentials | null> {
     const credentials = await prisma.whatsAppCredentials.findUnique({

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -205,7 +205,7 @@ export default function CustomersPage() {
       notes: customer.notes || '',
       tags: customer.tags.map((t) => t.id),
       typeId: customer.type?.id || '',
-      gender: customer.gender || '',
+      gender: (customer.gender || '') as any,
       company: customer.company || '',
       source: customer.source || '',
       optIn: customer.optIn,
@@ -305,13 +305,13 @@ export default function CustomersPage() {
             />
           </div>
           <div className="flex gap-2">
-            <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+            <Select value={selectedTypeId || 'all'} onValueChange={(val) => setSelectedTypeId(val === 'all' ? '' : val)}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 {contactTypes.map((ct) => (
                   <SelectItem key={ct.id} value={ct.id}>
                     {ct.name}
@@ -321,15 +321,15 @@ export default function CustomersPage() {
             </Select>
 
             <Select
-              value={filterOptIn === null ? '' : filterOptIn.toString()}
-              onValueChange={(val) => setFilterOptIn(val === '' ? null : val === 'true')}
+              value={filterOptIn === null ? 'all' : filterOptIn.toString()}
+              onValueChange={(val) => setFilterOptIn(val === 'all' ? null : val === 'true')}
             >
               <SelectTrigger className="w-[140px]">
                 <Filter className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Opt-in" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="true">
                   <CheckCircle2 className="mr-2 h-4 w-4 text-green-500 inline" />
                   Opted In
@@ -593,12 +593,12 @@ export default function CustomersPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="typeId">Contact Type</Label>
-                    <Select value={formState.typeId} onValueChange={(val) => setFormState({ ...formState, typeId: val })}>
+                    <Select value={formState.typeId || 'none'} onValueChange={(val) => setFormState({ ...formState, typeId: val === 'none' ? '' : val })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No type</SelectItem>
+                        <SelectItem value="none">No type</SelectItem>
                         {contactTypes.map((ct) => (
                           <SelectItem key={ct.id} value={ct.id}>
                             {ct.name}

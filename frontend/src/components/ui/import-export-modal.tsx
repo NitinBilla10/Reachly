@@ -15,6 +15,7 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Info,
+  Filter,
 } from 'lucide-react'
 import { customersAPI } from '@/lib/api'
 import toast from 'react-hot-toast'
@@ -59,6 +60,11 @@ export default function ImportExportModal({ open, onClose }: { open: boolean; on
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
+      // Check file size (5MB)
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB')
+        return
+      }
       setFile(selectedFile)
       setImportProgress(null)
     }
@@ -364,7 +370,7 @@ Bob Johnson,+1 555 0198,bob@startup.io,Startup Labs,import,other,Potential clien
                       {file ? file.name : 'Choose CSV file'}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {file ? `(${(file.size / 1024).toFixed(2)} KB)` : 'Max 10MB'}
+                      {file ? `(${(file.size / 1024).toFixed(2)} KB)` : 'Max 5MB'}
                     </span>
                   </label>
                 </div>
@@ -541,7 +547,7 @@ Bob Johnson,+1 555 0198,bob@startup.io,Startup Labs,import,other,Potential clien
                     </ul>
                   </div>
                 </div>
-              </div>
+
 
               {/* Export Button */}
               <div className="flex justify-end">
