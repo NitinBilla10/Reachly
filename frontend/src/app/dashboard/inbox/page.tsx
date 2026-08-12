@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { messagesAPI, customersAPI, templatesAPI } from '@/lib/api'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
+import { useSocket, SocketMessage } from '@/lib/socket'
 
 export default function InboxPage() {
   const [conversations, setConversations] = useState<any[]>([])
@@ -27,6 +28,8 @@ export default function InboxPage() {
   const [newMessageTemplateId, setNewMessageTemplateId] = useState('')
   const [isStartingChat, setIsStartingChat] = useState(false)
 
+  const socketClient = useSocket()
+
   useEffect(() => {
     fetchConversations()
     fetchCustomersAndTemplates()
@@ -36,6 +39,14 @@ export default function InboxPage() {
     if (activeConversationId) {
       setMessages([]) // Clear messages when switching conversations
       fetchMessages(activeConversationId)
+      // Tell socket we joined this conversation
+      socketClient.joinConversation(activeConversationId)
+    }
+
+    return () => {
+      if (activeConversationId) {
+        socketClient.leaveConversation(activeConversationId)
+      }
     }
   }, [activeConversationId])
 
@@ -45,6 +56,49 @@ export default function InboxPage() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  // Real-time Socket Event Listeners
+  useEffect(() => {
+    const handleNewMessage = (newMessage: SocketMessage) => {
+      // If message belongs to active chat, append it to view
+      if (newMessage.conversationId === activeConversationId) {
+        setMessages((prev) => {
+          // Prevent duplicates
+          if (prev.some(m => m.id === newMessage.id)) return prev
+          return [...prev, newMessage]
+        })
+      }
+      
+      // Always update conversation list
+      setConversations((prev) => 
+        prev.map(c => {
+          if (c.id === newMessage.conversationId) {
+            return {
+              ...c,
+              lastMessage: newMessage,
+              updatedAt: new Date().toISOString(),
+              unreadCount: newMessage.conversationId === activeConversationId ? 0 : (c.unreadCount + 1)
+            }
+          }
+          return c
+        })
+      )
+    }
+
+    const handleMessageStatus = (data: { messageId: string, status: string }) => {
+      setMessages((prev) => 
+        prev.map(m => m.id === data.messageId ? { ...m, status: data.status } : m)
+      )
+    }
+
+    socketClient.on('message_received', handleNewMessage)
+    socketClient.on('message_status_updated', handleMessageStatus)
+
+    return () => {
+      socketClient.off('message_received', handleNewMessage)
+      socketClient.off('message_status_updated', handleMessageStatus)
+    }
+  }, [socketClient, activeConversationId])
 
   const fetchConversations = async () => {
     try {
