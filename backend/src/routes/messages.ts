@@ -157,7 +157,10 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
     let messageContent = validatedData.content;
     let templateId = null;
 
-    // If using a template, process it
+    // Send message via WhatsApp API
+    const whatsappService = new WhatsAppService();
+    let result;
+
     if (validatedData.messageType === 'template' && validatedData.templateId) {
       const template = await prisma.template.findFirst({
         where: {
@@ -171,24 +174,36 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
       }
 
       templateId = template.id;
+      messageContent = template.content;
 
-      // Replace template variables
+      const parameters: Array<{ type: string; text: string }> = [];
+      
+      // Replace template variables for local DB record and prepare parameters for API
       if (validatedData.templateVariables) {
-        messageContent = template.content;
         Object.entries(validatedData.templateVariables).forEach(([key, value]) => {
+          // Replace locally for display in UI
           const regex = new RegExp(`{{${key}}}`, 'g');
           messageContent = messageContent.replace(regex, String(value));
+          
+          // Add to WhatsApp API parameters array
+          parameters.push({ type: 'text', text: String(value) });
         });
       }
-    }
 
-    // Send message via WhatsApp API
-    const whatsappService = new WhatsAppService();
-    const result = await whatsappService.sendTextMessage(
-      req.user!.id,
-      conversation.customer.phone,
-      messageContent
-    );
+      result = await whatsappService.sendTemplateMessage(
+        req.user!.id,
+        conversation.customer.phone,
+        template.name,
+        'en_US',
+        parameters
+      );
+    } else {
+      result = await whatsappService.sendTextMessage(
+        req.user!.id,
+        conversation.customer.phone,
+        messageContent
+      );
+    }
 
     if (!result.success) {
       throw createError(`Failed to send message: ${result.error}`, 400);
