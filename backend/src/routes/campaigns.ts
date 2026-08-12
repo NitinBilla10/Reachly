@@ -125,12 +125,14 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       throw createError('No customers found with the selected tags', 400);
     }
 
+    const { tagIds, ...campaignData } = validatedData;
+
     const campaign = await prisma.campaign.create({
       data: {
-        ...validatedData,
+        ...campaignData,
         userId: req.user!.id,
         totalMessages: customerCount,
-        scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : null
+        scheduledAt: campaignData.scheduledAt ? new Date(campaignData.scheduledAt) : null
       },
       include: {
         template: true
