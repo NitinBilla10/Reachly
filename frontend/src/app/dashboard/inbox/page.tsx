@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Send, Search, UserCircle2, ArrowLeft } from 'lucide-react'
+import { Send, Search, UserCircle2, ArrowLeft, MessageSquarePlus, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { messagesAPI } from '@/lib/api'
+import { messagesAPI, customersAPI, templatesAPI } from '@/lib/api'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 
@@ -20,8 +20,16 @@ export default function InboxPage() {
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  const [customers, setCustomers] = useState<any[]>([])
+  const [templates, setTemplates] = useState<any[]>([])
+  const [isNewMessageDialogOpen, setIsNewMessageDialogOpen] = useState(false)
+  const [newMessageCustomerId, setNewMessageCustomerId] = useState('')
+  const [newMessageTemplateId, setNewMessageTemplateId] = useState('')
+  const [isStartingChat, setIsStartingChat] = useState(false)
+
   useEffect(() => {
     fetchConversations()
+    fetchCustomersAndTemplates()
   }, [])
 
   useEffect(() => {
@@ -49,6 +57,19 @@ export default function InboxPage() {
       toast.error('Failed to load conversations')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchCustomersAndTemplates = async () => {
+    try {
+      const [custRes, tempRes] = await Promise.all([
+        customersAPI.getAll({ limit: 1000 }),
+        templatesAPI.getAll()
+      ])
+      if (custRes.data.data?.customers) setCustomers(custRes.data.data.customers)
+      if (tempRes.data.data) setTemplates(tempRes.data.data)
+    } catch (error) {
+      console.error('Failed to load customers or templates:', error)
     }
   }
 
@@ -100,6 +121,38 @@ export default function InboxPage() {
     }
   }
 
+  const handleStartNewChat = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newMessageCustomerId || !newMessageTemplateId) return
+
+    try {
+      setIsStartingChat(true)
+      const selectedTemplate = templates.find(t => t.id === newMessageTemplateId)
+      
+      const res = await messagesAPI.send({
+        customerId: newMessageCustomerId,
+        content: selectedTemplate?.content || '',
+        messageType: 'template',
+        templateId: newMessageTemplateId
+      })
+
+      // Refresh conversations to get the new or updated conversation
+      await fetchConversations()
+      
+      // Set the active conversation to the newly created/updated one
+      setActiveConversationId(res.data.data.conversationId)
+      setIsNewMessageDialogOpen(false)
+      setNewMessageCustomerId('')
+      setNewMessageTemplateId('')
+      toast.success('Conversation started successfully')
+    } catch (error: any) {
+      console.error('Failed to start chat:', error)
+      toast.error(error.response?.data?.error || 'Failed to start chat')
+    } finally {
+      setIsStartingChat(false)
+    }
+  }
+
   const activeConversation = conversations.find(c => c.id === activeConversationId)
 
   return (
@@ -107,9 +160,14 @@ export default function InboxPage() {
       {/* Conversations List */}
       <Card className={`flex h-[calc(100vh-160px)] lg:h-[calc(100vh-160px)] flex-col ${activeConversationId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="border-b p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search conversations" />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Search conversations" />
+            </div>
+            <Button size="icon" variant="outline" onClick={() => setIsNewMessageDialogOpen(true)}>
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         <ScrollArea className="flex-1">
@@ -237,6 +295,77 @@ export default function InboxPage() {
           </div>
         )}
       </Card>
+
+      {/* New Message Dialog */}
+      {isNewMessageDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b p-4">
+              <div>
+                <h3 className="font-semibold">Start New Chat</h3>
+                <p className="text-xs text-muted-foreground">Select a customer and a template</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setIsNewMessageDialogOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              <form id="new-chat-form" onSubmit={handleStartNewChat} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Customer</label>
+                  <select
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={newMessageCustomerId}
+                    onChange={(e) => setNewMessageCustomerId(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>Select a customer...</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.phone})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">WhatsApp Template</label>
+                  <select
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={newMessageTemplateId}
+                    onChange={(e) => setNewMessageTemplateId(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>Select a template...</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {newMessageTemplateId && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Preview</label>
+                    <div className="p-3 bg-muted rounded-md text-sm whitespace-pre-wrap">
+                      {templates.find(t => t.id === newMessageTemplateId)?.content || ''}
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+            <div className="border-t p-4 flex justify-end gap-2 bg-muted/20">
+              <Button type="button" variant="outline" onClick={() => setIsNewMessageDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" form="new-chat-form" disabled={isStartingChat || !newMessageCustomerId || !newMessageTemplateId}>
+                {isStartingChat ? 'Sending...' : 'Start Chat'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

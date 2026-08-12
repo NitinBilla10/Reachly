@@ -246,7 +246,8 @@ export const messagesAPI = {
   }) => api.get(`/messages/conversations/${conversationId}/messages`, { params }),
 
   send: (data: {
-    conversationId: string
+    conversationId?: string
+    customerId?: string
     content: string
     messageType?: 'text' | 'template'
     templateId?: string

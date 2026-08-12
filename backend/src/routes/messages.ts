@@ -99,16 +99,56 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
   try {
     const validatedData = sendMessageSchema.parse(req.body);
 
-    // Verify conversation belongs to user
-    const conversation = await prisma.conversation.findFirst({
-      where: {
-        id: validatedData.conversationId,
-        userId: req.user!.id
-      },
-      include: {
-        customer: true
+    let conversation;
+
+    if (validatedData.conversationId) {
+      // Verify conversation belongs to user
+      conversation = await prisma.conversation.findFirst({
+        where: {
+          id: validatedData.conversationId,
+          userId: req.user!.id
+        },
+        include: {
+          customer: true
+        }
+      });
+    } else if (validatedData.customerId) {
+      // Find existing conversation for this customer or create a new one
+      conversation = await prisma.conversation.findFirst({
+        where: {
+          customerId: validatedData.customerId,
+          userId: req.user!.id
+        },
+        include: {
+          customer: true
+        }
+      });
+
+      if (!conversation) {
+        // We need the customer to create the conversation and for the phone number
+        const customer = await prisma.customer.findFirst({
+          where: {
+            id: validatedData.customerId,
+            userId: req.user!.id
+          }
+        });
+
+        if (!customer) {
+          throw createError('Customer not found', 404);
+        }
+
+        conversation = await prisma.conversation.create({
+          data: {
+            userId: req.user!.id,
+            customerId: customer.id,
+            status: 'active'
+          },
+          include: {
+            customer: true
+          }
+        });
       }
-    });
+    }
 
     if (!conversation) {
       throw createError('Conversation not found', 404);
@@ -157,7 +197,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
     // Create message record
     const message = await prisma.message.create({
       data: {
-        conversationId: validatedData.conversationId,
+        conversationId: conversation.id,
         customerId: conversation.customerId,
         templateId,
         content: messageContent,
@@ -174,7 +214,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 
     // Update conversation
     await prisma.conversation.update({
-      where: { id: validatedData.conversationId },
+      where: { id: conversation.id },
       data: {
         lastMessageAt: new Date(),
         updatedAt: new Date()
@@ -184,7 +224,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
     // Emit real-time update
     const socketService = getSocketService();
     if (socketService) {
-      socketService.emitNewMessage(validatedData.conversationId, message);
+      socketService.emitNewMessage(conversation.id, message);
     }
 
     res.status(201).json({

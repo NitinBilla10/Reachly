@@ -77,11 +77,14 @@ export const createCampaignSchema = z.object({
 });
 
 export const sendMessageSchema = z.object({
-  conversationId: z.string().min(1, 'Conversation ID is required'),
+  conversationId: z.string().optional(),
+  customerId: z.string().optional(),
   content: z.string().min(1, 'Message content is required'),
   messageType: z.enum(['text', 'template']).default('text'),
   templateId: z.string().optional(),
   templateVariables: z.record(z.string()).optional()
+}).refine(data => data.conversationId || data.customerId, {
+  message: "Either conversationId or customerId is required"
 });
 
 export const updateWhatsAppCredentialsSchema = z.object({
