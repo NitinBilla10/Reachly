@@ -394,7 +394,8 @@ async function processCampaignMessages(campaignId: string, userId: string) {
         status: 'pending'
       },
       include: {
-        customer: true
+        customer: true,
+        template: true
       }
     });
 
@@ -408,7 +409,7 @@ async function processCampaignMessages(campaignId: string, userId: string) {
         const result = await whatsappService.sendTemplateMessage(
           userId,
           message.customer.phone,
-          '', // Template name would come from template
+          message.template.name, // Template name comes from template relation
           'en_US'
         );
 
