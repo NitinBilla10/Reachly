@@ -410,7 +410,7 @@ async function processCampaignMessages(campaignId: string, userId: string) {
           userId,
           message.customer.phone,
           message.template.name, // Template name comes from template relation
-          'en_US'
+          message.template.language // Use the actual template language
         );
 
         if (result.success) {

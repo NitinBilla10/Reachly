@@ -194,7 +194,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
         req.user!.id,
         conversation.customer.phone,
         template.name,
-        'en_US',
+        template.language,
         parameters
       );
     } else {
