@@ -405,12 +405,23 @@ async function processCampaignMessages(campaignId: string, userId: string) {
 
     for (const message of campaignMessages) {
       try {
+        // Prepare template parameters based on customer data
+        const parameters: Array<{ type: string; text: string }> = [];
+        if (message.template.variables) {
+          const variables = message.template.variables as string[];
+          variables.forEach(variable => {
+            const value = (message.customer as any)[variable] || '';
+            parameters.push({ type: 'text', text: String(value) });
+          });
+        }
+
         // Send message via WhatsApp API
         const result = await whatsappService.sendTemplateMessage(
           userId,
           message.customer.phone,
           message.template.name, // Template name comes from template relation
-          message.template.language // Use the actual template language
+          message.template.language, // Use the actual template language
+          parameters
         );
 
         if (result.success) {
