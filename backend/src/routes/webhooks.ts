@@ -41,14 +41,12 @@ router.post('/whatsapp', async (req: Request, res: Response) => {
         if (entry.changes) {
           for (const change of entry.changes) {
             if (change.field === 'messages') {
-              await handleIncomingMessage(change.value);
-            }
-            
-            // Handle message status updates
-            if (change.field === 'message_deliveries' || 
-                change.field === 'message_reads' ||
-                change.field === 'message_failures') {
-              await handleMessageStatusUpdate(change.value, change.field);
+              if (change.value.messages) {
+                await handleIncomingMessage(change.value);
+              }
+              if (change.value.statuses) {
+                await handleMessageStatusUpdate(change.value);
+              }
             }
           }
         }
@@ -70,17 +68,32 @@ async function handleIncomingMessage(value: any) {
     const messages = value.messages;
     const contacts = value.contacts;
 
+    const metadata = value.metadata;
+
     if (!messages || messages.length === 0) return;
+
+    // Get WhatsApp credentials to find the user
+    const credentials = await prisma.whatsAppCredentials.findFirst({
+      where: { phoneNumberId: metadata?.phone_number_id }
+    });
+
+    if (!credentials) {
+      console.log(`Unknown phone number ID: ${metadata?.phone_number_id}`);
+      return;
+    }
+
+    const userId = credentials.userId;
 
     for (const message of messages) {
       const from = message.from; // Customer's phone number
       const messageId = message.id;
       const timestamp = new Date(parseInt(message.timestamp) * 1000);
 
-      // Find the customer by phone number
-      const customer = await prisma.customer.findFirst({
+      // Find the customer by phone number (using endsWith to ignore formatting)
+      const last10 = from.slice(-10);
+      let customer = await prisma.customer.findFirst({
         where: {
-          phone: from
+          phone: { endsWith: last10 }
         },
         include: {
           user: true
@@ -88,8 +101,25 @@ async function handleIncomingMessage(value: any) {
       });
 
       if (!customer) {
-        console.log(`Received message from unknown number: ${from}`);
-        continue;
+        // Find name from contacts if available
+        let name = from;
+        if (contacts && contacts.length > 0) {
+          const contact = contacts.find((c: any) => c.wa_id === from);
+          if (contact && contact.profile && contact.profile.name) {
+            name = contact.profile.name;
+          }
+        }
+
+        // Create the customer
+        customer = await prisma.customer.create({
+          data: {
+            userId,
+            phone: from,
+            name: name,
+            source: 'whatsapp'
+          },
+          include: { user: true }
+        });
       }
 
       // Find or create conversation
@@ -184,7 +214,7 @@ async function handleIncomingMessage(value: any) {
 }
 
 // Handle message status updates
-async function handleMessageStatusUpdate(value: any, field: string) {
+async function handleMessageStatusUpdate(value: any) {
   try {
     const statuses = value.statuses;
 
