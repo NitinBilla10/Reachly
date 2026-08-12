@@ -61,7 +61,7 @@ export function PWAInstallPrompt() {
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-96 bg-primary text-primary-foreground p-4 rounded-xl shadow-2xl z-50 flex flex-col gap-3 animate-in slide-in-from-bottom-5">
       <div className="flex justify-between items-start">
         <div className="flex gap-3 items-center">
-          <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center p-1">
+          <div className="h-10 w-10 bg-transparent rounded-lg flex items-center justify-center p-1">
             <img src="/icons/icon-192x192.png" alt="Reachly Icon" className="w-full h-full rounded-md object-contain" />
           </div>
           <div>
