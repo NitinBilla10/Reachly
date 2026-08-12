@@ -60,9 +60,11 @@ export class WhatsAppService {
         return { success: false, error: 'WhatsApp credentials not found' };
       }
 
+      const formattedTo = to.replace(/\D/g, '');
+
       const payload: WhatsAppMessage = {
         messaging_product: 'whatsapp',
-        to,
+        to: formattedTo,
         type: 'text',
         text: {
           body: message
@@ -112,9 +114,11 @@ export class WhatsAppService {
         .replace(/_+/g, '_')
         .replace(/^_|_$/g, '');
 
+      const formattedTo = to.replace(/\D/g, '');
+
       const payload: WhatsAppMessage = {
         messaging_product: 'whatsapp',
-        to,
+        to: formattedTo,
         type: 'template',
         template: {
           name: formattedTemplateName,
