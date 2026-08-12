@@ -106,12 +106,18 @@ export class WhatsAppService {
         return { success: false, error: 'WhatsApp credentials not found' };
       }
 
+      const formattedTemplateName = templateName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
       const payload: WhatsAppMessage = {
         messaging_product: 'whatsapp',
         to,
         type: 'template',
         template: {
-          name: templateName,
+          name: formattedTemplateName,
           language: {
             code: language
           },
