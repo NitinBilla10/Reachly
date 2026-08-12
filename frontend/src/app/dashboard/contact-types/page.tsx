@@ -133,14 +133,14 @@ export default function ContactTypesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Contact Types</h1>
           <p className="text-muted-foreground mt-1">
             Manage contact categories and classifications
           </p>
         </div>
-        <Button onClick={openDialog}>
+        <Button onClick={openDialog} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Add Contact Type
         </Button>
@@ -173,17 +173,17 @@ export default function ContactTypesPage() {
       </div>
 
       {/* Search and Filter */}
-      <div className="flex gap-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search contact types..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 w-full"
           />
         </div>
-        <Button variant="outline" disabled>
+        <Button variant="outline" disabled className="w-full sm:w-auto">
           <Filter className="mr-2 h-4 w-4" />
           Filters
         </Button>

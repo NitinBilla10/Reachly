@@ -9,6 +9,10 @@ export function PWAInstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false)
 
   useEffect(() => {
+    // Check if user already dismissed or installed
+    if (localStorage.getItem('pwaPromptDismissed') === 'true') {
+      return
+    }
     const handler = (e: Event) => {
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault()
@@ -24,6 +28,11 @@ export function PWAInstallPrompt() {
       window.removeEventListener('beforeinstallprompt', handler)
     }
   }, [])
+
+  const handleDismiss = () => {
+    localStorage.setItem('pwaPromptDismissed', 'true')
+    setShowPrompt(false)
+  }
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return
@@ -41,6 +50,7 @@ export function PWAInstallPrompt() {
     }
     
     // We no longer need the prompt. Clear it up.
+    localStorage.setItem('pwaPromptDismissed', 'true')
     setDeferredPrompt(null)
     setShowPrompt(false)
   }
@@ -59,7 +69,7 @@ export function PWAInstallPrompt() {
             <p className="text-xs text-primary-foreground/80">Add to homescreen for the best experience.</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setShowPrompt(false)} className="h-6 w-6 rounded-full hover:bg-white/20 text-white">
+        <Button variant="ghost" size="icon" onClick={handleDismiss} className="h-6 w-6 rounded-full hover:bg-white/20 text-white">
           <X className="h-4 w-4" />
         </Button>
       </div>

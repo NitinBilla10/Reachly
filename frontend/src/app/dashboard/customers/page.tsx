@@ -379,126 +379,129 @@ export default function CustomersPage() {
       </Card>
 
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[80px]">Customer</TableHead>
-              <TableHead>Contact Info</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Opt-in</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Tags</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  Loading customers...
-                </TableCell>
+                <TableHead className="w-[80px]">Customer</TableHead>
+                <TableHead>Contact Info</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Opt-in</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Tags</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : customers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  No customers found.
-                  {!hasActiveFilters && ' Add your first customer to get started.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              customers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      {customer.image ? (
-                        <Avatar className="h-9 w-9">
-                          <img src={customer.image} alt={customer.name} className="h-full w-full object-cover" />
-                        </Avatar>
-                      ) : (
-                        <Avatar className="h-9 w-9 bg-primary">
-                          <AvatarFallback className="text-xs font-medium">
-                            {customer.name.split(' ').map((n) => n[0]).join('').toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div>
-                        <div className="font-medium">{customer.name}</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          {customer.phone}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {customer.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="h-3 w-3 text-muted-foreground" />
-                        {customer.email}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {customer.company && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Building2 className="h-3 w-3 text-muted-foreground" />
-                        {customer.company}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {customer.source && (
-                      <Badge variant="outline" className="text-xs">
-                        {customer.source}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {customer.optIn ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {customer.type && (
-                      <Badge
-                        variant="secondary"
-                        style={{ backgroundColor: `${customer.type.color}20`, color: customer.type.color }}
-                      >
-                        {customer.type.name}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {customer.tags.length === 0 ? (
-                        <Badge variant="outline" className="text-xs">No tags</Badge>
-                      ) : (
-                        customer.tags.map((tag) => (
-                          <Badge key={tag.id} variant="secondary" className="text-xs" style={{ backgroundColor: `${tag.color}20`, color: tag.color }}>
-                            {tag.name}
-                          </Badge>
-                        ))
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    Loading customers...
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : customers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    No customers found.
+                    {!hasActiveFilters && ' Add your first customer to get started.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                customers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3 min-w-[150px]">
+                        {customer.image ? (
+                          <Avatar className="h-9 w-9">
+                            <img src={customer.image} alt={customer.name} className="h-full w-full object-cover" />
+                          </Avatar>
+                        ) : (
+                          <Avatar className="h-9 w-9 bg-primary">
+                            <AvatarFallback className="text-xs font-medium">
+                              {customer.name.split(' ').map((n) => n[0]).join('').toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div>
+                          <div className="font-medium">{customer.name}</div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3" />
+                            {customer.phone}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {customer.email && (
+                        <div className="flex items-center gap-2 text-sm min-w-[150px]">
+                          <Mail className="h-3 w-3 text-muted-foreground" />
+                          {customer.email}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {customer.company && (
+                        <div className="flex items-center gap-2 text-sm min-w-[100px]">
+                          <Building2 className="h-3 w-3 text-muted-foreground" />
+                          {customer.company}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {customer.source && (
+                        <Badge variant="outline" className="text-xs whitespace-nowrap">
+                          {customer.source}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {customer.optIn ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-500" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {customer.type && (
+                        <Badge
+                          variant="secondary"
+                          className="whitespace-nowrap"
+                          style={{ backgroundColor: `${customer.type.color}20`, color: customer.type.color }}
+                        >
+                          {customer.type.name}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1 min-w-[150px]">
+                        {customer.tags.length === 0 ? (
+                          <Badge variant="outline" className="text-xs">No tags</Badge>
+                        ) : (
+                          customer.tags.map((tag) => (
+                            <Badge key={tag.id} variant="secondary" className="text-xs whitespace-nowrap" style={{ backgroundColor: `${tag.color}20`, color: tag.color }}>
+                              {tag.name}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1 min-w-[80px]">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       {isDialogOpen && (
