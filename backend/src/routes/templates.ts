@@ -75,18 +75,43 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Call WhatsApp API to create the template
+    const whatsappService = new WhatsAppService();
+    const metaResponse = await whatsappService.createMessageTemplate(
+      req.user!.id,
+      validatedData.name,
+      validatedData.category,
+      validatedData.language || 'en_US',
+      validatedData.content
+    );
+
+    if (!metaResponse.success) {
+      return res.status(400).json({
+        success: false,
+        error: `Meta Template Rejection: ${metaResponse.error}`
+      });
+    }
+
+    const formattedTemplateName = validatedData.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
     const template = await prisma.template.create({
       data: {
         ...validatedData,
+        name: formattedTemplateName,
         variables: variables,
-        status: 'approved',
+        status: metaResponse.status?.toLowerCase() || 'pending',
+        whatsappTemplateId: metaResponse.templateId,
         userId: req.user!.id
       }
     });
 
     res.status(201).json({
       success: true,
-      message: 'Template created successfully',
+      message: 'Template created and synced successfully',
       data: template
     });
   } catch (error: any) {

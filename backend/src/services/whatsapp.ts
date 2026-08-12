@@ -191,4 +191,60 @@ export class WhatsAppService {
 
     return { success: false, error: 'Invalid verification token' };
   }
+
+  async createMessageTemplate(
+    userId: string,
+    name: string,
+    category: string,
+    language: string,
+    content: string
+  ): Promise<{ success: boolean; templateId?: string; status?: string; error?: string }> {
+    try {
+      const credentials = await this.getCredentials(userId);
+      if (!credentials) {
+        return { success: false, error: 'WhatsApp credentials not found' };
+      }
+
+      const formattedTemplateName = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
+      const payload = {
+        name: formattedTemplateName,
+        language,
+        category: category.toUpperCase(),
+        components: [
+          {
+            type: 'BODY',
+            text: content
+          }
+        ]
+      };
+
+      const response = await axios.post(
+        `https://graph.facebook.com/v17.0/${credentials.businessId}/message_templates`,
+        payload,
+        {
+          headers: {
+            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      return { 
+        success: true, 
+        templateId: response.data.id,
+        status: response.data.status || 'PENDING'
+      };
+    } catch (error: any) {
+      console.error('WhatsApp Template Creation Error:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message
+      };
+    }
+  }
 }
