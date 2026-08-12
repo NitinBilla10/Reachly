@@ -27,6 +27,11 @@ import { authenticateToken } from './middleware/auth';
 // Import services
 import { initializeSocket } from './services/socket';
 
+// Fix BigInt serialization for Prisma raw queries (PostgreSQL COUNT returns BigInt)
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 dotenv.config();
 
 const app = express();
