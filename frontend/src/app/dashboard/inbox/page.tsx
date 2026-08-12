@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Send, Search, UserCircle2 } from 'lucide-react'
+import { Send, Search, UserCircle2, ArrowLeft } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -105,7 +105,7 @@ export default function InboxPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
       {/* Conversations List */}
-      <Card className="flex h-[calc(100vh-160px)] flex-col">
+      <Card className={`flex h-[calc(100vh-160px)] lg:h-[calc(100vh-160px)] flex-col ${activeConversationId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="border-b p-4">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -152,22 +152,29 @@ export default function InboxPage() {
       </Card>
 
       {/* Message Thread */}
-      <Card className="flex h-[calc(100vh-160px)] flex-col">
+      <Card className={`flex h-[calc(100vh-160px)] flex-col ${!activeConversationId ? 'hidden lg:flex' : 'flex'}`}>
         {activeConversation ? (
           <>
             <div className="border-b p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{activeConversation.customer?.name || activeConversation.customer?.phone}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {activeConversation.customer?.phone}
-                  </p>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setActiveConversationId(null)}>
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex-1 overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold truncate">{activeConversation.customer?.name || activeConversation.customer?.phone}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {activeConversation.customer?.phone}
+                      </p>
+                    </div>
+                    {activeConversation.customer?.tags?.map((tag: any) => (
+                      <Badge key={tag.id} variant="secondary" className="hidden sm:inline-flex" style={{ backgroundColor: tag.color ? `${tag.color}20` : undefined, color: tag.color }}>
+                        {tag.name}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                {activeConversation.customer?.tags?.map((tag: any) => (
-                  <Badge key={tag.id} variant="secondary" style={{ backgroundColor: tag.color ? `${tag.color}20` : undefined, color: tag.color }}>
-                    {tag.name}
-                  </Badge>
-                ))}
               </div>
             </div>
             <ScrollArea className="flex-1 p-4" ref={scrollRef}>
