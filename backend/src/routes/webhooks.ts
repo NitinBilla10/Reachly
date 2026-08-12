@@ -101,25 +101,8 @@ async function handleIncomingMessage(value: any) {
       });
 
       if (!customer) {
-        // Find name from contacts if available
-        let name = from;
-        if (contacts && contacts.length > 0) {
-          const contact = contacts.find((c: any) => c.wa_id === from);
-          if (contact && contact.profile && contact.profile.name) {
-            name = contact.profile.name;
-          }
-        }
-
-        // Create the customer
-        customer = await prisma.customer.create({
-          data: {
-            userId,
-            phone: from,
-            name: name,
-            source: 'whatsapp'
-          },
-          include: { user: true }
-        });
+        console.log(`Received message from unknown number: ${from}`);
+        continue;
       }
 
       // Find or create conversation
@@ -314,7 +297,7 @@ async function handleMessageStatusUpdate(value: any) {
       // Emit real-time message status update
       const socketService = getSocketService();
       if (socketService) {
-        socketService.emitMessageStatusUpdate(message.conversationId, messageId, statusType);
+        socketService.emitMessageStatusUpdate(message.conversationId, message.id, statusType);
       }
 
       console.log(`Updated message ${messageId} status to ${statusType}`);

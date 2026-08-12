@@ -422,6 +422,57 @@ async function processCampaignMessages(campaignId: string, userId: string) {
               whatsappMessageId: result.messageId
             }
           });
+          
+          // Find or create conversation to show in inbox
+          let conversation = await prisma.conversation.findUnique({
+            where: {
+              userId_customerId: {
+                userId,
+                customerId: message.customerId
+              }
+            }
+          });
+
+          if (!conversation) {
+            conversation = await prisma.conversation.create({
+              data: {
+                userId,
+                customerId: message.customerId,
+                status: 'active',
+                lastMessageAt: new Date()
+              }
+            });
+          } else {
+            await prisma.conversation.update({
+              where: { id: conversation.id },
+              data: {
+                lastMessageAt: new Date(),
+                updatedAt: new Date()
+              }
+            });
+          }
+
+          // Create message in inbox
+          const inboxMessage = await prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              customerId: message.customerId,
+              templateId: message.templateId,
+              content: message.content,
+              messageType: 'template',
+              direction: 'outbound',
+              whatsappMessageId: result.messageId,
+              status: 'sent'
+            },
+            include: {
+              customer: true
+            }
+          });
+
+          if (socketService) {
+            socketService.emitNewMessage(conversation.id, inboxMessage);
+          }
+
           sentCount++;
         } else {
           await prisma.campaignMessage.update({
