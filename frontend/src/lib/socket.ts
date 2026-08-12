@@ -63,7 +63,7 @@ class SocketClient {
     this.connect()
   }
 
-  private connect() {
+  connect() {
     const token = getAuthToken()
     
     if (!token) {
