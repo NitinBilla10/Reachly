@@ -17,11 +17,20 @@ router.get('/conversations', async (req: AuthRequest, res: Response) => {
       },
       include: {
         customer: true,
+        messages: {
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 1
+        },
         _count: {
           select: {
             messages: {
               where: {
-                direction: 'inbound'
+                direction: 'inbound',
+                status: {
+                  not: 'read'
+                }
               }
             }
           }
@@ -32,9 +41,18 @@ router.get('/conversations', async (req: AuthRequest, res: Response) => {
       }
     });
 
+    const formattedConversations = conversations.map(conv => {
+      const { messages, _count, ...rest } = conv;
+      return {
+        ...rest,
+        lastMessage: messages[0] || null,
+        unreadCount: _count.messages
+      };
+    });
+
     res.json({
       success: true,
-      data: conversations
+      data: formattedConversations
     });
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
@@ -63,6 +81,21 @@ router.get('/conversations/:id/messages', async (req: AuthRequest, res: Response
     if (!conversation) {
       throw createError('Conversation not found', 404);
     }
+
+    // Mark inbound unread messages as read
+    await prisma.message.updateMany({
+      where: {
+        conversationId: id,
+        direction: 'inbound',
+        status: {
+          not: 'read'
+        }
+      },
+      data: {
+        status: 'read',
+        readAt: new Date()
+      }
+    });
 
     const messages = await prisma.message.findMany({
       where: {

@@ -135,8 +135,11 @@ export default function InboxPage() {
         // The backend already reverses it to chronological order
         setMessages(res.data.data.messages)
       }
-      // Also mark conversation as read
-      // messagesAPI.markAsRead(...) could be called here if implemented for conversations
+      
+      // Reset unread count in the UI state
+      setConversations(prev => prev.map(c => 
+        c.id === id ? { ...c, unreadCount: 0 } : c
+      ))
     } catch (error) {
       console.error('Failed to load messages:', error)
       toast.error('Failed to load messages')
