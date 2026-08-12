@@ -196,17 +196,26 @@ export default function SettingsPage() {
               />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>Webhook verification token</Label>
-            <Input 
-              placeholder="reachly-webhook-token" 
-              value={whatsapp.webhookVerifyToken}
-              onChange={(e) => setWhatsapp({...whatsapp, webhookVerifyToken: e.target.value})}
-            />
-          </div>
-          <Button variant="outline" onClick={handleSaveWhatsApp} disabled={isSavingWhatsApp}>
-            {isSavingWhatsApp ? 'Verifying...' : 'Verify & save'}
+          <Button onClick={handleSaveWhatsApp} disabled={isSavingWhatsApp}>
+            {isSavingWhatsApp ? 'Saving...' : 'Save credentials'}
           </Button>
+
+          <div className="mt-8 pt-6 border-t">
+            <h3 className="text-lg font-medium mb-4">Webhook Setup Instructions</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              In your Meta Developer Dashboard, set up your Webhook with the following details so that Reachly can receive your messages:
+            </p>
+            <div className="bg-muted p-4 rounded-md space-y-3 font-mono text-sm break-all">
+              <div>
+                <span className="font-semibold block text-xs text-muted-foreground uppercase tracking-wider mb-1">Callback URL:</span>
+                https://reachly-4u2x.onrender.com/webhooks/whatsapp
+              </div>
+              <div>
+                <span className="font-semibold block text-xs text-muted-foreground uppercase tracking-wider mb-1">Verify Token:</span>
+                your-webhook-verify-token-here
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
