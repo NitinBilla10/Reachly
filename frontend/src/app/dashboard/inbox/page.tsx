@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { Send, Search, UserCircle2, ArrowLeft, MessageSquarePlus, X, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,21 @@ export default function InboxPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const activeConversation = useMemo(() => {
+    return conversations.find(c => c.id === activeConversationId)
+  }, [conversations, activeConversationId])
+
+  const is24HourWindowOpen = useMemo(() => {
+    if (!activeConversation) return false
+    if (!activeConversation.lastCustomerMessageAt) return false
+    
+    const lastMessageDate = new Date(activeConversation.lastCustomerMessageAt)
+    const now = new Date()
+    const diffHours = (now.getTime() - lastMessageDate.getTime()) / (1000 * 60 * 60)
+    
+    return diffHours <= 24
+  }, [activeConversation])
 
   const [customers, setCustomers] = useState<any[]>([])
   const [templates, setTemplates] = useState<any[]>([])
@@ -212,8 +227,6 @@ export default function InboxPage() {
     }
   }
 
-  const activeConversation = conversations.find(c => c.id === activeConversationId)
-
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
       {/* Conversations List */}
@@ -337,21 +350,41 @@ export default function InboxPage() {
                 )}
               </div>
             </ScrollArea>
-            <div className="border-t p-4">
+            <div className="border-t p-4 flex flex-col gap-2">
+              {!is24HourWindowOpen && (
+                <div className="text-xs text-orange-500 bg-orange-50 p-2 rounded flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{activeConversation.lastCustomerMessageAt === null ? 'WhatsApp 24-hour window closed. You must use a Template message to start this conversation.' : 'WhatsApp 24-hour window closed (customer last replied >24h ago). You must use a Template message to resume.'}</span>
+                </div>
+              )}
               <form 
                 className="flex items-center gap-2"
                 onSubmit={(e) => {
                   e.preventDefault()
-                  handleSendMessage()
+                  if (is24HourWindowOpen) {
+                    handleSendMessage()
+                  }
                 }}
               >
                 <Input 
-                  placeholder="Type a message..." 
+                  placeholder={is24HourWindowOpen ? "Type a message..." : "Window closed. Send a template..."} 
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  disabled={isSending}
+                  disabled={isSending || !is24HourWindowOpen}
                 />
-                <Button size="icon" type="submit" disabled={isSending || !replyText.trim()}>
+                {!is24HourWindowOpen && (
+                  <Button 
+                    type="button" 
+                    variant="secondary"
+                    onClick={() => {
+                      setNewMessageCustomerId(activeConversation.customer?.id)
+                      setIsNewMessageDialogOpen(true)
+                    }}
+                  >
+                    Send Template
+                  </Button>
+                )}
+                <Button type="submit" disabled={isSending || !replyText.trim() || !is24HourWindowOpen}>
                   <Send className="h-4 w-4" />
                 </Button>
               </form>

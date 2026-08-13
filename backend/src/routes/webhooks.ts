@@ -121,7 +121,8 @@ async function handleIncomingMessage(value: any) {
             userId: customer.userId,
             customerId: customer.id,
             status: 'active',
-            lastMessageAt: timestamp
+            lastMessageAt: timestamp,
+            lastCustomerMessageAt: timestamp
           }
         });
       }
@@ -132,6 +133,20 @@ async function handleIncomingMessage(value: any) {
 
       if (message.type === 'text') {
         content = message.text.body;
+        
+        // Opt-in / Opt-out logic
+        const lowerContent = content.toLowerCase().trim();
+        if (['stop', 'unsubscribe', 'cancel'].includes(lowerContent)) {
+          await prisma.customer.update({
+            where: { id: customer.id },
+            data: { optIn: false }
+          });
+        } else if (['start', 'subscribe'].includes(lowerContent)) {
+          await prisma.customer.update({
+            where: { id: customer.id },
+            data: { optIn: true }
+          });
+        }
       } else if (message.type === 'template') {
         content = `[Template] ${message.template.name}`;
         messageType = 'template';
@@ -175,6 +190,7 @@ async function handleIncomingMessage(value: any) {
         where: { id: conversation.id },
         data: {
           lastMessageAt: timestamp,
+          lastCustomerMessageAt: timestamp,
           updatedAt: new Date()
         }
       });
@@ -272,14 +288,16 @@ async function handleMessageStatusUpdate(value: any) {
         });
 
         if (campaign) {
-          const newDeliveredCount = campaign.deliveredMessages + (statusType === 'delivered' ? 1 : 0);
-
-          await prisma.campaign.update({
-            where: { id: campaign.id },
-            data: {
-              deliveredMessages: newDeliveredCount
-            }
-          });
+          let deliveredCount = campaign.deliveredMessages;
+          if (statusType === 'delivered') {
+            const updatedCampaign = await prisma.campaign.update({
+              where: { id: campaign.id },
+              data: {
+                deliveredMessages: { increment: 1 }
+              }
+            });
+            deliveredCount = updatedCampaign.deliveredMessages;
+          }
 
           // Emit real-time campaign update
           const socketService = getSocketService();
@@ -288,7 +306,7 @@ async function handleMessageStatusUpdate(value: any) {
               type: 'message_status_updated',
               messageId,
               status: statusType,
-              deliveredCount: newDeliveredCount
+              deliveredCount
             });
           }
         }

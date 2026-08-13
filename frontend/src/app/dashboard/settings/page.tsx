@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Cookies from 'js-cookie'
+import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +15,7 @@ import { settingsAPI } from '@/lib/api'
 import toast from 'react-hot-toast'
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingWhatsApp, setIsSavingWhatsApp] = useState(false)
@@ -98,10 +102,16 @@ export default function SettingsPage() {
       })
       toast.success('WhatsApp credentials verified and saved!')
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to verify WhatsApp credentials.')
+      toast.error(error.response?.data?.error || 'Failed to save WhatsApp credentials.')
     } finally {
       setIsSavingWhatsApp(false)
     }
+  }
+
+  const handleLogout = () => {
+    Cookies.remove('auth-token')
+    router.push('/auth/login')
+    toast.success('Logged out successfully')
   }
 
   if (isLoading) {
@@ -219,7 +229,22 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-
+      <Card className="border-red-200">
+        <CardHeader>
+          <CardTitle className="text-red-600 flex items-center gap-2">
+            <LogOut className="h-5 w-5" />
+            Danger Zone
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Logging out will end your current session and require you to sign in again to access the dashboard.
+          </p>
+          <Button variant="destructive" onClick={handleLogout}>
+            Log out
+          </Button>
+        </CardContent>
+      </Card>
 
     </div>
   )

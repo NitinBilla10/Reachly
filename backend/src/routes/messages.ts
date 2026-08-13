@@ -187,6 +187,17 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
       throw createError('Conversation not found', 404);
     }
 
+    if (validatedData.messageType === 'text') {
+      const now = new Date();
+      if (!conversation.lastCustomerMessageAt) {
+        throw createError('WhatsApp 24-hour window closed. You must use a Template message.', 400);
+      }
+      const hoursSinceLastMessage = (now.getTime() - conversation.lastCustomerMessageAt.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceLastMessage > 24) {
+        throw createError('WhatsApp 24-hour window closed. You must use a Template message.', 400);
+      }
+    }
+
     let messageContent = validatedData.content;
     let templateId = null;
 

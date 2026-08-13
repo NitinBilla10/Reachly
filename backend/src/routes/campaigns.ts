@@ -113,6 +113,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const customerCount = await prisma.customer.count({
       where: {
         userId: req.user!.id,
+        optIn: true,
         tags: {
           some: {
             tagId: { in: validatedData.tagIds }
@@ -186,6 +187,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
     const customers = await prisma.customer.findMany({
       where: {
         userId: req.user!.id,
+        optIn: true,
         tags: {
           some: {
             tagId: { in: req.body.tagIds || [] }

@@ -220,8 +220,9 @@ export default function DashboardPage() {
                       {campaign.status}
                     </Badge>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                     <span>Target: {campaign.totalMessages || 0}</span>
+                    <span>Sent: {campaign.sentMessages || 0}</span>
                     <span>Delivered: {campaign.deliveredMessages || 0}</span>
                   </div>
                 </div>
