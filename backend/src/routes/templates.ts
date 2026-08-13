@@ -4,12 +4,19 @@ import { createError } from '../middleware/errorHandler';
 import { createTemplateSchema, updateTemplateSchema } from '../validation/common';
 import { AuthRequest } from '../middleware/auth';
 import { WhatsAppService } from '../services/whatsapp';
+import { getCache, setCache, invalidatePattern } from '../services/cache';
 
 const router = Router();
 
 // Get all templates
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
+    const cacheKey = `templates:${req.user!.id}`;
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+
     const templates = await prisma.template.findMany({
       where: {
         userId: req.user!.id
@@ -19,10 +26,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       }
     });
 
-    res.json({
+    const responseData = {
       success: true,
       data: templates
-    });
+    };
+
+    await setCache(cacheKey, responseData, 86400); // 24 hours
+    res.json(responseData);
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
       success: false,
@@ -109,6 +119,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       }
     });
 
+    await invalidatePattern(`templates:${req.user!.id}*`);
+
     res.status(201).json({
       success: true,
       message: 'Template created and synced successfully',
@@ -171,6 +183,8 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       }
     });
 
+    await invalidatePattern(`templates:${req.user!.id}*`);
+
     res.json({
       success: true,
       message: 'Template updated successfully',
@@ -222,6 +236,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     await prisma.template.delete({
       where: { id }
     });
+
+    await invalidatePattern(`templates:${req.user!.id}*`);
 
     res.json({
       success: true,

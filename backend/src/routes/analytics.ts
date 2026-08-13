@@ -3,6 +3,7 @@ import { prisma } from '../services/database';
 import { Prisma } from '@prisma/client';
 import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
+import { getCache, setCache } from '../services/cache';
 
 const router = Router();
 
@@ -10,6 +11,11 @@ const router = Router();
 router.get('/overview', async (req: AuthRequest, res: Response) => {
   try {
     const { period = '30d' } = req.query;
+    const cacheKey = `analytics:overview:${req.user!.id}:${period}`;
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
     
     const startDate = getStartDate(period as string);
 
@@ -117,7 +123,7 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
       take: 5
     });
 
-    res.json({
+    const responseData = {
       success: true,
       data: {
         overview: {
@@ -134,7 +140,10 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
         recentMessages,
         topTags
       }
-    });
+    };
+
+    await setCache(cacheKey, responseData, 300); // Cache for 5 mins
+    res.json(responseData);
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
       success: false,
@@ -147,6 +156,11 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
 router.get('/messages', async (req: AuthRequest, res: Response) => {
   try {
     const { period = '30d', groupBy = 'day' } = req.query;
+    const cacheKey = `analytics:messages:${req.user!.id}:${period}:${groupBy}`;
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
     
     const startDate = getStartDate(period as string);
     const interval = getInterval(groupBy as string);
@@ -155,13 +169,14 @@ router.get('/messages', async (req: AuthRequest, res: Response) => {
     const messageAnalytics = await prisma.$queryRaw`
       SELECT 
         DATE_TRUNC(${Prisma.raw(`'${interval}'`)}, "sentAt") as date,
-        direction,
-        COUNT(*) as count
+        CAST(COUNT(CASE WHEN m.status = 'sent' THEN 1 END) AS INTEGER) as sent,
+        CAST(COUNT(CASE WHEN m.status = 'delivered' THEN 1 END) AS INTEGER) as delivered
       FROM "messages" m
       JOIN "conversations" c ON m."conversationId" = c.id
       WHERE c."userId" = ${req.user!.id}
         AND m."sentAt" >= ${startDate}
-      GROUP BY DATE_TRUNC(${Prisma.raw(`'${interval}'`)}, "sentAt"), direction
+        AND m.direction = 'outbound'
+      GROUP BY DATE_TRUNC(${Prisma.raw(`'${interval}'`)}, "sentAt")
       ORDER BY date ASC
     `;
 
@@ -182,13 +197,16 @@ router.get('/messages', async (req: AuthRequest, res: Response) => {
       }
     });
 
-    res.json({
+    const responseData = {
       success: true,
       data: {
         messageAnalytics,
         deliveryStats
       }
-    });
+    };
+
+    await setCache(cacheKey, responseData, 600); // Cache for 10 mins
+    res.json(responseData);
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
       success: false,
@@ -201,6 +219,11 @@ router.get('/messages', async (req: AuthRequest, res: Response) => {
 router.get('/campaigns', async (req: AuthRequest, res: Response) => {
   try {
     const { period = '30d' } = req.query;
+    const cacheKey = `analytics:campaigns:${req.user!.id}:${period}`;
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
     
     const startDate = getStartDate(period as string);
 
@@ -261,13 +284,16 @@ router.get('/campaigns', async (req: AuthRequest, res: Response) => {
       ORDER BY date ASC
     `;
 
-    res.json({
+    const responseData = {
       success: true,
       data: {
         campaigns: campaignStats,
         performance: campaignPerformance
       }
-    });
+    };
+
+    await setCache(cacheKey, responseData, 600); // Cache for 10 mins
+    res.json(responseData);
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
       success: false,
@@ -280,6 +306,11 @@ router.get('/campaigns', async (req: AuthRequest, res: Response) => {
 router.get('/customers', async (req: AuthRequest, res: Response) => {
   try {
     const { period = '30d' } = req.query;
+    const cacheKey = `analytics:customers:${req.user!.id}:${period}`;
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
     
     const startDate = getStartDate(period as string);
 
@@ -357,7 +388,7 @@ router.get('/customers', async (req: AuthRequest, res: Response) => {
       take: 5
     });
 
-    res.json({
+    const responseData = {
       success: true,
       data: {
         customerGrowth,
@@ -365,7 +396,10 @@ router.get('/customers', async (req: AuthRequest, res: Response) => {
         mostActiveCustomers,
         recentCustomers
       }
-    });
+    };
+
+    await setCache(cacheKey, responseData, 900); // Cache for 15 mins
+    res.json(responseData);
   } catch (error: any) {
     res.status(error.statusCode || 500).json({
       success: false,

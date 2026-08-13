@@ -402,6 +402,7 @@ async function processCampaignMessages(campaignId: string, userId: string) {
     let sentCount = 0;
     let deliveredCount = 0;
     let failedCount = 0;
+    let lastEmitTime = Date.now();
 
     for (const message of campaignMessages) {
       try {
@@ -497,13 +498,18 @@ async function processCampaignMessages(campaignId: string, userId: string) {
           failedCount++;
         }
 
-        // Emit real-time update
+        // Emit real-time update (Debounced to every 2 seconds)
         if (socketService) {
-          socketService.emitCampaignUpdate(userId, campaignId, {
-            type: 'message_sent',
-            messageId: message.id,
-            status: result.success ? 'sent' : 'failed'
-          });
+          const now = Date.now();
+          if (now - lastEmitTime > 2000) {
+            socketService.emitCampaignUpdate(userId, campaignId, {
+              type: 'progress_update',
+              sentCount,
+              failedCount,
+              deliveredCount
+            });
+            lastEmitTime = now;
+          }
         }
 
         // Rate limiting - wait 1 second between messages

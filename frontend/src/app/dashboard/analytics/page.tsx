@@ -1,86 +1,72 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import {
-  Bar,
-  BarChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Cell,
-} from 'recharts'
+import { useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { analyticsAPI, campaignsAPI } from '@/lib/api'
 import { format } from 'date-fns'
 
+import { BarChart, Bar, PieChart, Pie, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts'
+import { useQuery } from '@tanstack/react-query'
+
 const COLORS = ['hsl(var(--primary))', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-
 export default function AnalyticsPage() {
-  const [messageData, setMessageData] = useState<any[]>([])
-  const [tagEngagement, setTagEngagement] = useState<any[]>([])
-  const [campaignStats, setCampaignStats] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: overviewRes, isLoading: overviewLoading } = useQuery({
+    queryKey: ['analytics', 'overview', '30d'],
+    queryFn: () => analyticsAPI.getOverview('30d')
+  })
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        setIsLoading(true)
-        const [overviewRes, messagesRes, campaignsRes] = await Promise.all([
-          analyticsAPI.getOverview('30d'),
-          analyticsAPI.getMessages('7d', 'day'),
-          campaignsAPI.getAll()
-        ])
+  const { data: messagesRes, isLoading: messagesLoading } = useQuery({
+    queryKey: ['analytics', 'messages', '7d', 'day'],
+    queryFn: () => analyticsAPI.getMessages('7d', 'day')
+  })
 
-        // Message Delivery Chart
-        if (messagesRes.data.data && Array.isArray(messagesRes.data.data)) {
-          const chartFormatted = messagesRes.data.data.map((item: any) => ({
-            name: format(new Date(item.date), 'EEE'),
-            sent: item.sent,
-            delivered: item.delivered
-          }))
-          setMessageData(chartFormatted)
-        }
+  const { data: campaignsRes, isLoading: campaignsLoading } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: () => campaignsAPI.getAll()
+  })
 
-        // Top Tags Pie Chart
-        const topTags = overviewRes.data.data.topTags
-        if (topTags && Array.isArray(topTags)) {
-          const formattedTags = topTags.map((tag: any) => ({
-            name: tag.name,
-            value: tag._count.customers
-          })).filter((tag: any) => tag.value > 0)
-          
-          setTagEngagement(formattedTags)
-        }
+  const isLoading = overviewLoading || messagesLoading || campaignsLoading
 
-        // Campaign Performance
-        if (campaignsRes.data.data && Array.isArray(campaignsRes.data.data)) {
-          const formattedCampaigns = campaignsRes.data.data
-            .filter((c: any) => c.status === 'completed' || c.status === 'active')
-            .map((c: any) => ({
-              name: c.name,
-              sent: c.targetCount || 0,
-              delivered: c.deliveredCount || 0,
-              rate: c.targetCount > 0 
-                ? `${Math.round((c.deliveredCount / c.targetCount) * 100)}%` 
-                : '0%'
-            }))
-            .slice(0, 3)
-          setCampaignStats(formattedCampaigns)
-        }
-
-      } catch (error) {
-        console.error('Failed to fetch analytics:', error)
-      } finally {
-        setIsLoading(false)
-      }
+  const messageData = useMemo(() => {
+    if (messagesRes?.data?.data && Array.isArray(messagesRes.data.data.messageAnalytics)) {
+      return messagesRes.data.data.messageAnalytics.map((item: any) => ({
+        name: format(new Date(item.date), 'EEE'),
+        sent: item.sent || 0,
+        delivered: item.delivered || 0
+      }))
     }
+    return []
+  }, [messagesRes])
 
-    fetchAnalytics()
-  }, [])
+  const tagEngagement = useMemo(() => {
+    const topTags = overviewRes?.data?.data?.topTags
+    if (topTags && Array.isArray(topTags)) {
+      return topTags.map((tag: any) => ({
+        name: tag.name,
+        value: tag._count.customers
+      })).filter((tag: any) => tag.value > 0)
+    }
+    return []
+  }, [overviewRes])
+
+  const campaignStats = useMemo(() => {
+    if (campaignsRes?.data?.data && Array.isArray(campaignsRes.data.data)) {
+      return campaignsRes.data.data
+        .filter((c: any) => c.status === 'completed' || c.status === 'active' || c.status === 'sending')
+        .map((c: any) => ({
+          name: c.name,
+          sent: c.totalMessages || 0,
+          delivered: c.deliveredMessages || 0,
+          rate: c.totalMessages > 0 
+            ? `${Math.round((c.deliveredMessages / c.totalMessages) * 100)}%` 
+            : '0%'
+        }))
+        .slice(0, 3)
+    }
+    return []
+  }, [campaignsRes])
 
   if (isLoading) {
     return (
@@ -174,7 +160,7 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           {campaignStats.length > 0 ? (
-            campaignStats.map((campaign) => (
+            campaignStats.map((campaign: any) => (
               <div key={campaign.name} className="rounded-lg border p-4">
                 <p className="text-sm font-semibold truncate">{campaign.name}</p>
                 <p className="mt-2 text-2xl font-semibold">{campaign.sent.toLocaleString()}</p>

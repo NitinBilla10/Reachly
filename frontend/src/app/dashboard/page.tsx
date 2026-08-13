@@ -1,8 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import dynamic from 'next/dynamic'
 import { ArrowUpRight, MessageSquare, Send, Users, Zap } from 'lucide-react'
+
+import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,46 +14,56 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 
 export default function DashboardPage() {
-  const [data, setData] = useState<any>(null)
-  const [messagesChart, setMessagesChart] = useState<any[]>([])
-  const [campaigns, setCampaigns] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: overviewRes, isLoading: overviewLoading } = useQuery({
+    queryKey: ['analytics', 'overview', '30d'],
+    queryFn: () => analyticsAPI.getOverview('30d')
+  })
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true)
-        const [overviewRes, messagesRes, campaignsRes] = await Promise.all([
-          analyticsAPI.getOverview('30d'),
-          analyticsAPI.getMessages('7d', 'day'),
-          campaignsAPI.getAll()
-        ])
+  const { data: messagesRes, isLoading: messagesLoading } = useQuery({
+    queryKey: ['analytics', 'messages', '7d', 'day'],
+    queryFn: () => analyticsAPI.getMessages('7d', 'day')
+  })
 
-        setData(overviewRes.data.data.overview)
-        
-        // Format message chart data
-        if (messagesRes.data.data && Array.isArray(messagesRes.data.data)) {
-          const chartFormatted = messagesRes.data.data.map((item: any) => ({
-            day: format(new Date(item.date), 'EEE'),
-            messages: item.sent + item.delivered
-          }))
-          setMessagesChart(chartFormatted)
-        }
+  const { data: campaignsRes, isLoading: campaignsLoading } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: () => campaignsAPI.getAll()
+  })
 
-        // Set recent campaigns
-        if (campaignsRes.data.data && Array.isArray(campaignsRes.data.data)) {
-          setCampaigns(campaignsRes.data.data.slice(0, 4))
-        }
+  const { data: customersRes, isLoading: customersLoading } = useQuery({
+    queryKey: ['analytics', 'customers', '30d'],
+    queryFn: () => analyticsAPI.getCustomers('30d')
+  })
 
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error)
-      } finally {
-        setIsLoading(false)
-      }
+  const isLoading = overviewLoading || messagesLoading || campaignsLoading || customersLoading
+
+  const data = overviewRes?.data?.data?.overview || null
+
+  const messagesChart = useMemo(() => {
+    if (messagesRes?.data?.data && Array.isArray(messagesRes.data.data.messageAnalytics)) {
+      return messagesRes.data.data.messageAnalytics.map((item: any) => ({
+        day: format(new Date(item.date), 'EEE'),
+        messages: (item.sent || 0) + (item.delivered || 0)
+      }))
     }
+    return []
+  }, [messagesRes])
 
-    fetchDashboardData()
-  }, [])
+  const customerChart = useMemo(() => {
+    if (customersRes?.data?.data?.customerGrowth && Array.isArray(customersRes.data.data.customerGrowth)) {
+      return customersRes.data.data.customerGrowth.map((item: any) => ({
+        date: format(new Date(item.date), 'MMM dd'),
+        customers: Number(item.count) || 0
+      }))
+    }
+    return []
+  }, [customersRes])
+
+  const campaigns = useMemo(() => {
+    if (campaignsRes?.data?.data && Array.isArray(campaignsRes.data.data)) {
+      return campaignsRes.data.data.slice(0, 4)
+    }
+    return []
+  }, [campaignsRes])
 
   const stats = [
     {
@@ -109,8 +122,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <Card>
-          <CardHeader>
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
             <CardTitle>Weekly Message Volume</CardTitle>
             <CardDescription>Messages sent across all campaigns (Last 7 Days)</CardDescription>
           </CardHeader>
@@ -149,6 +163,48 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Customer Growth</CardTitle>
+            <CardDescription>New customers acquired (Last 30 Days)</CardDescription>
+          </CardHeader>
+          <CardContent className="h-72">
+            {customerChart.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={customerChart}>
+                  <defs>
+                    <linearGradient id="customers" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '12px',
+                      border: '1px solid hsl(var(--border))',
+                      background: 'hsl(var(--card))',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="customers"
+                    stroke="#10b981"
+                    fill="url(#customers)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No customer growth data available.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Recent Campaigns</CardTitle>
@@ -156,7 +212,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {campaigns.length > 0 ? (
-              campaigns.map((campaign) => (
+              campaigns.map((campaign: any) => (
                 <div key={campaign.id} className="rounded-lg border p-4">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold truncate max-w-[150px]">{campaign.name}</p>
@@ -165,8 +221,8 @@ export default function DashboardPage() {
                     </Badge>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Target: {campaign.targetCount || 0}</span>
-                    <span>Delivered: {campaign.deliveredCount || 0}</span>
+                    <span>Target: {campaign.totalMessages || 0}</span>
+                    <span>Delivered: {campaign.deliveredMessages || 0}</span>
                   </div>
                 </div>
               ))

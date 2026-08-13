@@ -58,9 +58,25 @@ class SocketClient {
   private socket: Socket | null = null
   private listeners: Map<string, Set<Function>> = new Map()
   private isConnected = false
+  private lastTypingTime = 0
 
   constructor() {
     this.connect()
+    this.setupVisibilityListener()
+  }
+
+  private setupVisibilityListener() {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          console.log('App in background, disconnecting socket to save resources')
+          this.disconnect()
+        } else if (document.visibilityState === 'visible') {
+          console.log('App in foreground, reconnecting socket')
+          this.connect()
+        }
+      })
+    }
   }
 
   connect() {
@@ -186,8 +202,12 @@ class SocketClient {
   }
 
   startTyping(conversationId: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('typing_start', { conversationId })
+    const now = Date.now()
+    if (now - this.lastTypingTime > 3000) {
+      if (this.socket && this.isConnected) {
+        this.socket.emit('typing_start', { conversationId })
+        this.lastTypingTime = now
+      }
     }
   }
 

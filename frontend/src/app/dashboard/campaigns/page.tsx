@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { campaignsAPI, tagsAPI, templatesAPI } from '@/lib/api'
+import socketClient from '@/lib/socket'
 
 interface TagItem {
   id: string
@@ -67,6 +68,52 @@ export default function CampaignsPage() {
 
   useEffect(() => {
     fetchData()
+
+    const handleCampaignUpdate = (data: any) => {
+      setCampaigns((prev) =>
+        prev.map((c) => {
+          if (c.id === data.campaignId) {
+            if (data.type === 'progress_update') {
+              return {
+                ...c,
+                status: 'sending',
+                sentMessages: data.sentCount || 0,
+                deliveredMessages: data.deliveredCount || 0
+              }
+            }
+            if (data.type === 'message_sent') {
+              return {
+                ...c,
+                status: 'sending',
+                sentMessages:
+                  data.status === 'sent'
+                    ? (c.sentMessages || 0) + 1
+                    : c.sentMessages || 0,
+              }
+            }
+            if (data.type === 'completed') {
+              return {
+                ...c,
+                status: 'completed',
+                sentMessages: data.sentCount,
+              }
+            }
+            if (data.type === 'cancelled') {
+              return {
+                ...c,
+                status: 'failed',
+              }
+            }
+          }
+          return c
+        })
+      )
+    }
+
+    socketClient.on('campaign_update', handleCampaignUpdate)
+    return () => {
+      socketClient.off('campaign_update', handleCampaignUpdate)
+    }
   }, [])
 
   const selectedTemplate = useMemo(
@@ -118,6 +165,7 @@ export default function CampaignsPage() {
     if (status === 'completed') return 'success'
     if (status === 'failed') return 'destructive'
     if (status === 'sending') return 'warning'
+    if (status === 'draft') return 'secondary'
     return 'secondary'
   }
 

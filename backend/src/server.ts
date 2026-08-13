@@ -26,6 +26,7 @@ import { authenticateToken } from './middleware/auth';
 
 // Import services
 import { initializeSocket } from './services/socket';
+import { initCache } from './services/cache';
 
 // Fix BigInt serialization for Prisma raw queries (PostgreSQL COUNT returns BigInt)
 (BigInt.prototype as any).toJSON = function () {
